@@ -371,6 +371,7 @@ create table public.audit_logs (
   entity_type text not null,
   entity_id uuid,
   action text not null,
+  reason text,
   before_data jsonb,
   after_data jsonb,
   ip_address inet,

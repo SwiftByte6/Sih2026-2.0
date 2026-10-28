@@ -33,6 +33,7 @@ export default function InstitutionReleasePage() {
 
   // New Release Application Modal
   const [modalOpen, setModalOpen] = useState(false);
+  const [modalError, setModalError] = useState("");
   const [selectedFdr, setSelectedFdr] = useState("fdr-008");
   const [affidavitUploaded, setAffidavitUploaded] = useState(true);
   const [requestLetterUploaded, setRequestLetterUploaded] = useState(true);
@@ -54,6 +55,7 @@ export default function InstitutionReleasePage() {
   const handleCreateReleaseRequest = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setModalError("");
 
     try {
       const newReq = await createReleaseRequest({
@@ -68,6 +70,7 @@ export default function InstitutionReleasePage() {
       setModalOpen(false);
     } catch (err) {
       console.error("Failed to create release request:", err);
+      setModalError(err.message || "Failed to submit release application.");
     } finally {
       setIsSubmitting(false);
     }
@@ -218,6 +221,12 @@ export default function InstitutionReleasePage() {
           }
         >
           <div className="space-y-4 text-xs">
+            {modalError && (
+              <Alert variant="error" title="Submission Error">
+                {modalError}
+              </Alert>
+            )}
+
             <Select
               label="Select Matured Instrument to Release"
               required

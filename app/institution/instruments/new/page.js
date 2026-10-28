@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -24,6 +24,7 @@ import { formatINR, createInstrument } from "@/lib/dataService";
 export default function NewInstrumentPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
+  const fileInputRef = useRef(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -41,13 +42,12 @@ export default function NewInstrumentPage() {
     signatory_designation: "Registrar & Authorized Signatory",
   });
 
-  // Simulated Document Upload & OCR state
-  const [uploadedFile, setUploadedFile] = useState({
-    name: "SBI_Security_Deposit_Receipt_35Lakh.pdf",
-    size: "1.4 MB",
-  });
+  // Real Document Upload & OCR state
+  const [uploadedFile, setUploadedFile] = useState(null);
+  const [fileError, setFileError] = useState("");
+  const [isDragging, setIsDragging] = useState(false);
   const [isExtractingOcr, setIsExtractingOcr] = useState(false);
-  const [ocrCompleted, setOcrCompleted] = useState(true);
+  const [ocrCompleted, setOcrCompleted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionSuccess, setSubmissionSuccess] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -56,12 +56,40 @@ export default function NewInstrumentPage() {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSimulateFileUpload = () => {
+  const processSelectedFile = (file) => {
+    if (!file) return;
+    setFileError("");
+    setSubmitError("");
+
+    // 1. Validate PDF file type strictly
+    const isPdf =
+      (file.type && file.type === "application/pdf") ||
+      (file.name && file.name.toLowerCase().endsWith(".pdf"));
+    if (!isPdf) {
+      setFileError("Invalid file type. Only PDF documents (.pdf) are permitted.");
+      return;
+    }
+
+    // 2. Validate maximum file size (10 MB)
+    const MAX_SIZE = 10 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      setFileError(`File size (${(file.size / (1024 * 1024)).toFixed(2)} MB) exceeds the 10 MB maximum limit.`);
+      return;
+    }
+
+    setUploadedFile(file);
     setIsExtractingOcr(true);
     setTimeout(() => {
       setIsExtractingOcr(false);
       setOcrCompleted(true);
-    }, 700);
+    }, 600);
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processSelectedFile(file);
+    }
   };
 
   const handleFinalSubmit = async (e) => {
@@ -317,39 +345,81 @@ export default function NewInstrumentPage() {
             />
 
             <div className="space-y-6">
+              {fileError && (
+                <Alert variant="error" title="File Validation Error">
+                  {fileError}
+                </Alert>
+              )}
+
               {/* File Upload Zone */}
-              <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-blue-400 bg-slate-50/50 transition-colors">
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragging(true);
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragging(false);
+                  const file = e.dataTransfer.files?.[0];
+                  if (file) processSelectedFile(file);
+                }}
+                onClick={() => fileInputRef.current?.click()}
+                className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors cursor-pointer ${
+                  isDragging
+                    ? "border-blue-600 bg-blue-50/60"
+                    : "border-slate-300 hover:border-blue-400 bg-slate-50/50"
+                }`}
+              >
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept=".pdf,application/pdf"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
                 <Upload className="h-8 w-8 text-blue-700 mx-auto mb-2" />
                 <h4 className="text-sm font-semibold text-slate-900">
-                  Upload Scanned FDR Certificate PDF
+                  {uploadedFile ? "Replace FDR Certificate PDF" : "Upload Scanned FDR Certificate PDF"}
                 </h4>
                 <p className="text-xs text-slate-500 mt-1">
-                  Accepted formats: PDF, JPEG, PNG (Max file size: 10 MB)
+                  Click to browse or drag and drop your official deposit receipt (PDF only, up to 10 MB)
                 </p>
 
                 <div className="mt-4 flex items-center justify-center gap-3">
                   <Button
+                    type="button"
                     variant="secondary"
                     size="sm"
                     loading={isExtractingOcr}
-                    onClick={handleSimulateFileUpload}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      fileInputRef.current?.click();
+                    }}
                   >
-                    Simulate OCR Extraction
+                    {uploadedFile ? "Choose Different PDF" : "Select PDF Document"}
                   </Button>
                 </div>
               </div>
 
               {/* Uploaded File Pill */}
               {uploadedFile && (
-                <div className="p-3 rounded-lg border border-slate-200 bg-white flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-blue-700" />
-                    <span className="font-medium text-slate-800">{uploadedFile.name}</span>
-                    <span className="text-slate-400">({uploadedFile.size})</span>
+                <div className="p-3.5 rounded-lg border border-slate-200 bg-white flex items-center justify-between text-xs shadow-xs">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 bg-blue-50 text-blue-700 rounded-lg">
+                      <FileText className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <span className="font-semibold text-slate-900 block">{uploadedFile.name}</span>
+                      <span className="text-[11px] text-slate-400">
+                        {uploadedFile.size ? `${(uploadedFile.size / 1024 / 1024).toFixed(2)} MB • ` : ""}
+                        Ready for Supabase Storage Upload
+                      </span>
+                    </div>
                   </div>
-                  <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                  <span className="text-emerald-700 font-semibold flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded">
                     <CheckCircle2 className="h-3.5 w-3.5" />
-                    OCR Processed
+                    {ocrCompleted ? "OCR Processed" : "File Attached"}
                   </span>
                 </div>
               )}
@@ -463,20 +533,27 @@ export default function NewInstrumentPage() {
                 </div>
               </div>
 
+              {submitError && (
+                <Alert variant="error" title="Submission Failed">
+                  {submitError}
+                </Alert>
+              )}
+
               <SimulatedNoticeBanner message="Submitting will queue this deposit record for automated dummy bank verification and official review by AICTE North Region Verification Bureau." />
             </div>
 
             <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-              <Button variant="secondary" onClick={() => setCurrentStep(3)}>
+              <Button variant="secondary" disabled={isSubmitting} onClick={() => setCurrentStep(3)}>
                 Back
               </Button>
               <Button
                 variant="primary"
                 loading={isSubmitting}
+                disabled={isSubmitting}
                 onClick={handleFinalSubmit}
                 icon={CheckCircle2}
               >
-                Submit FDR for Official Verification
+                {isSubmitting ? "Uploading & Submitting..." : "Submit FDR for Official Verification"}
               </Button>
             </div>
           </Card>

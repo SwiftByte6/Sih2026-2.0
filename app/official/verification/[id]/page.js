@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Textarea } from "@/components/ui/Input";
 import { Alert, SimulatedNoticeBanner } from "@/components/ui/Alert";
+import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
 import {
   getInstrumentById,
   recordVerificationDecision,
@@ -55,6 +56,8 @@ function VerificationDetailContent() {
   const [decisionReason, setDecisionReason] = useState("");
   const [actionSuccessMessage, setActionSuccessMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [viewerDoc, setViewerDoc] = useState(null);
+  const [isViewerOpen, setIsViewerOpen] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -341,10 +344,21 @@ function VerificationDetailContent() {
                 </div>
                 <div>
                   <span className="text-slate-400 block text-[11px]">Supporting PDF Document</span>
-                  <span className="font-semibold text-blue-700 hover:underline flex items-center gap-1 cursor-pointer">
-                    <FileText className="h-3 w-3" />
-                    {instrument.documents?.[0]?.original_filename || "FDR_Receipt_Scan.pdf"}
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const doc = instrument.documents?.[0] || {
+                        original_filename: "FDR_Receipt_Scan.pdf",
+                        storage_path: `instruments/${instrument.institution_id}/${instrument.id}/receipt.pdf`,
+                      };
+                      setViewerDoc(doc);
+                      setIsViewerOpen(true);
+                    }}
+                    className="font-semibold text-blue-700 hover:text-blue-900 hover:underline flex items-center gap-1 cursor-pointer text-left"
+                  >
+                    <FileText className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{instrument.documents?.[0]?.original_filename || "FDR_Receipt_Scan.pdf"}</span>
+                  </button>
                 </div>
               </div>
             </Card>
@@ -583,6 +597,16 @@ function VerificationDetailContent() {
             />
           </div>
         </Modal>
+
+        {/* PDF Document Preview Modal */}
+        <PdfViewerModal
+          isOpen={isViewerOpen}
+          onClose={() => {
+            setIsViewerOpen(false);
+            setViewerDoc(null);
+          }}
+          document={viewerDoc}
+        />
 
       </div>
     </AppShell>

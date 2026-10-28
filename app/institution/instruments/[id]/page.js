@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -13,6 +13,7 @@ import {
   Send,
   Building2,
   RefreshCw,
+  Upload,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, SectionHeader } from "@/components/ui/Card";
@@ -21,9 +22,11 @@ import { StatusBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Input";
 import { Alert, SimulatedNoticeBanner } from "@/components/ui/Alert";
+import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
 import {
   getInstrumentById,
   sendClarification,
+  uploadDocument,
   formatINR,
   formatDate,
   formatDateTime,
@@ -46,6 +49,57 @@ function InstitutionInstrumentDetailContent() {
   const [clarificationText, setClarificationText] = useState("");
   const [clarificationSent, setClarificationSent] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState(null);
+  const [isViewerOpen, setIsViewerOpen] = useState(false);
+
+  // Document upload state
+  const uploadInputRef = useRef(null);
+  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+  const [uploadDocError, setUploadDocError] = useState("");
+  const [uploadDocSuccess, setUploadDocSuccess] = useState("");
+
+  const handleDirectUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadDocError("");
+    setUploadDocSuccess("");
+
+    const isPdf =
+      (file.type && file.type === "application/pdf") ||
+      (file.name && file.name.toLowerCase().endsWith(".pdf"));
+    if (!isPdf) {
+      setUploadDocError("Only PDF documents (.pdf) are permitted.");
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadDocError("File size exceeds the 10 MB limit.");
+      return;
+    }
+
+    setIsUploadingDoc(true);
+    try {
+      const newDoc = await uploadDocument({
+        file,
+        institutionId: instrument.institution_id,
+        instrumentId: instrument.id,
+        documentType: "OTHER",
+      });
+
+      setInstrument((prev) => ({
+        ...prev,
+        documents: [...(prev.documents || []), newDoc],
+      }));
+      setUploadDocSuccess("Document attached successfully.");
+      setTimeout(() => setUploadDocSuccess(""), 4000);
+    } catch (err) {
+      console.error("Direct upload failed:", err);
+      setUploadDocError(err.message || "Failed to upload document.");
+    } finally {
+      setIsUploadingDoc(false);
+      if (uploadInputRef.current) uploadInputRef.current.value = "";
+    }
+  };
 
   useEffect(() => {
     async function load() {
@@ -276,28 +330,74 @@ function InstitutionInstrumentDetailContent() {
           {/* Side Documents & Actions */}
           <div className="space-y-6">
             <Card className="p-5">
-              <SectionHeader
-                title="Attached Documents"
-                description="Uploaded evidence files"
-              />
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">Attached Documents</h3>
+                  <p className="text-xs text-slate-500">Uploaded evidence files</p>
+                </div>
+                <div>
+                  <input
+                    type="file"
+                    ref={uploadInputRef}
+                    accept=".pdf,application/pdf"
+                    className="hidden"
+                    onChange={handleDirectUpload}
+                  />
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    icon={Upload}
+                    loading={isUploadingDoc}
+                    disabled={isUploadingDoc}
+                    onClick={() => uploadInputRef.current?.click()}
+                  >
+                    Upload PDF
+                  </Button>
+                </div>
+              </div>
+
+              {uploadDocError && (
+                <div className="mb-3">
+                  <Alert variant="error">{uploadDocError}</Alert>
+                </div>
+              )}
+              {uploadDocSuccess && (
+                <div className="mb-3">
+                  <Alert variant="success">{uploadDocSuccess}</Alert>
+                </div>
+              )}
 
               <div className="space-y-2.5">
-                {instrument.documents?.map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="p-3 rounded-lg border border-slate-200 bg-white flex items-center justify-between text-xs"
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <FileText className="h-4 w-4 text-blue-700 shrink-0" />
-                      <span className="truncate font-medium text-slate-800">
-                        {doc.original_filename}
-                      </span>
-                    </div>
-                    <span className="text-blue-700 hover:underline font-medium cursor-pointer shrink-0 ml-2">
-                      View
-                    </span>
+                {(!instrument.documents || instrument.documents.length === 0) ? (
+                  <div className="p-4 text-center border border-dashed border-slate-200 rounded-lg text-xs text-slate-500">
+                    <FileText className="h-5 w-5 text-slate-400 mx-auto mb-1 opacity-70" />
+                    <span>No documents attached to this record</span>
                   </div>
-                ))}
+                ) : (
+                  instrument.documents.map((doc) => (
+                    <div
+                      key={doc.id || doc.storage_path}
+                      className="p-3 rounded-lg border border-slate-200 bg-white flex items-center justify-between text-xs hover:border-slate-300 transition-colors"
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <FileText className="h-4 w-4 text-blue-700 shrink-0" />
+                        <span className="truncate font-medium text-slate-800" title={doc.original_filename}>
+                          {doc.original_filename}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedDocument(doc);
+                          setIsViewerOpen(true);
+                        }}
+                        className="text-blue-700 hover:text-blue-900 hover:underline font-semibold cursor-pointer shrink-0 ml-2"
+                      >
+                        View
+                      </button>
+                    </div>
+                  ))
+                )}
               </div>
             </Card>
 
@@ -311,6 +411,16 @@ function InstitutionInstrumentDetailContent() {
             </Card>
           </div>
         </div>
+
+        {/* PDF Document Preview Modal */}
+        <PdfViewerModal
+          isOpen={isViewerOpen}
+          onClose={() => {
+            setIsViewerOpen(false);
+            setSelectedDocument(null);
+          }}
+          document={selectedDocument}
+        />
       </div>
     </AppShell>
   );

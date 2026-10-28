@@ -4,6 +4,108 @@
 
 begin;
 
+-- 0. SCHEMA COMPATIBILITY MIGRATION
+-- Ensure audit_logs has the reason column if not already present
+alter table public.audit_logs add column if not exists reason text;
+
+-- Ensure development / live mode anon access policies exist
+do $$
+begin
+  -- Institutions
+  if not exists (select 1 from pg_policies where policyname = 'anon_select_institutions' and tablename = 'institutions') then
+    create policy anon_select_institutions on public.institutions for select to anon using (true);
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'anon_insert_institutions' and tablename = 'institutions') then
+    create policy anon_insert_institutions on public.institutions for insert to anon with check (true);
+  end if;
+
+  -- Financial Instruments
+  if not exists (select 1 from pg_policies where policyname = 'anon_select_instruments' and tablename = 'financial_instruments') then
+    create policy anon_select_instruments on public.financial_instruments for select to anon using (true);
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'anon_insert_instruments' and tablename = 'financial_instruments') then
+    create policy anon_insert_instruments on public.financial_instruments for insert to anon with check (true);
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'anon_update_instruments' and tablename = 'financial_instruments') then
+    create policy anon_update_instruments on public.financial_instruments for update to anon using (true);
+  end if;
+
+  -- Documents & Extractions
+  if not exists (select 1 from pg_policies where policyname = 'anon_select_documents' and tablename = 'documents') then
+    create policy anon_select_documents on public.documents for select to anon using (true);
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'anon_insert_documents' and tablename = 'documents') then
+    create policy anon_insert_documents on public.documents for insert to anon with check (true);
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'anon_select_extractions' and tablename = 'document_extractions') then
+    create policy anon_select_extractions on public.document_extractions for select to anon using (true);
+  end if;
+
+  -- Verification Checks
+  if not exists (select 1 from pg_policies where policyname = 'anon_select_checks' and tablename = 'verification_checks') then
+    create policy anon_select_checks on public.verification_checks for select to anon using (true);
+  end if;
+
+  -- Release & Refund Requests
+  if not exists (select 1 from pg_policies where policyname = 'anon_select_releases' and tablename = 'release_refund_requests') then
+    create policy anon_select_releases on public.release_refund_requests for select to anon using (true);
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'anon_insert_releases' and tablename = 'release_refund_requests') then
+    create policy anon_insert_releases on public.release_refund_requests for insert to anon with check (true);
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'anon_update_releases' and tablename = 'release_refund_requests') then
+    create policy anon_update_releases on public.release_refund_requests for update to anon using (true);
+  end if;
+
+  -- Clearance Records
+  if not exists (select 1 from pg_policies where policyname = 'anon_select_clearances' and tablename = 'clearance_records') then
+    create policy anon_select_clearances on public.clearance_records for select to anon using (true);
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'anon_update_clearances' and tablename = 'clearance_records') then
+    create policy anon_update_clearances on public.clearance_records for update to anon using (true);
+  end if;
+
+  -- Workflow Tasks
+  if not exists (select 1 from pg_policies where policyname = 'anon_select_tasks' and tablename = 'workflow_tasks') then
+    create policy anon_select_tasks on public.workflow_tasks for select to anon using (true);
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'anon_update_tasks' and tablename = 'workflow_tasks') then
+    create policy anon_update_tasks on public.workflow_tasks for update to anon using (true);
+  end if;
+
+  -- Notifications
+  if not exists (select 1 from pg_policies where policyname = 'anon_select_notifications' and tablename = 'notifications') then
+    create policy anon_select_notifications on public.notifications for select to anon using (true);
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'anon_update_notifications' and tablename = 'notifications') then
+    create policy anon_update_notifications on public.notifications for update to anon using (true);
+  end if;
+
+  -- Lifecycle Events
+  if not exists (select 1 from pg_policies where policyname = 'anon_select_lifecycle' and tablename = 'lifecycle_events') then
+    create policy anon_select_lifecycle on public.lifecycle_events for select to anon using (true);
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'anon_insert_lifecycle' and tablename = 'lifecycle_events') then
+    create policy anon_insert_lifecycle on public.lifecycle_events for insert to anon with check (true);
+  end if;
+
+  -- Audit Logs
+  if not exists (select 1 from pg_policies where policyname = 'anon_select_audit' and tablename = 'audit_logs') then
+    create policy anon_select_audit on public.audit_logs for select to anon using (true);
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'anon_insert_audit' and tablename = 'audit_logs') then
+    create policy anon_insert_audit on public.audit_logs for insert to anon with check (true);
+  end if;
+
+  -- Integration Sync Logs
+  if not exists (select 1 from pg_policies where policyname = 'anon_select_integrations' and tablename = 'integration_sync_logs') then
+    create policy anon_select_integrations on public.integration_sync_logs for select to anon using (true);
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'anon_insert_integrations' and tablename = 'integration_sync_logs') then
+    create policy anon_insert_integrations on public.integration_sync_logs for insert to anon with check (true);
+  end if;
+end $$;
+
 -- 1. INSTITUTIONS
 insert into public.institutions (id, aicte_institution_id, institution_name, institution_type, state, district, city, address, pincode, official_email, official_phone, status)
 values

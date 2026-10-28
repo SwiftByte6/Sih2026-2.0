@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Textarea } from "@/components/ui/Input";
 import { Alert, SimulatedNoticeBanner } from "@/components/ui/Alert";
+import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
 import {
   getReleaseRequestById,
   updateClearance,
@@ -58,6 +59,8 @@ function ReleaseDetailContent() {
   const [approvalModalOpen, setApprovalModalOpen] = useState(false);
   const [nocNumber, setNocNumber] = useState("");
   const [approvalRemarks, setApprovalRemarks] = useState("");
+  const [viewerDoc, setViewerDoc] = useState(null);
+  const [isViewerOpen, setIsViewerOpen] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -307,9 +310,19 @@ function ReleaseDetailContent() {
                     <span className="text-slate-400 block text-[11px]">{doc.filename}</span>
                   </div>
                 </div>
-                <span className="text-blue-700 hover:underline font-medium cursor-pointer shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setViewerDoc({
+                      original_filename: doc.filename,
+                      storage_path: `release/${doc.filename}`,
+                    });
+                    setIsViewerOpen(true);
+                  }}
+                  className="text-blue-700 hover:text-blue-900 hover:underline font-medium cursor-pointer shrink-0"
+                >
                   Inspect File →
-                </span>
+                </button>
               </div>
             ))}
           </div>
@@ -505,6 +518,16 @@ function ReleaseDetailContent() {
             />
           </div>
         </Modal>
+
+        {/* PDF Document Preview Modal */}
+        <PdfViewerModal
+          isOpen={isViewerOpen}
+          onClose={() => {
+            setIsViewerOpen(false);
+            setViewerDoc(null);
+          }}
+          document={viewerDoc}
+        />
 
       </div>
     </AppShell>
