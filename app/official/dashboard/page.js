@@ -14,6 +14,8 @@ import {
   AlertCircle,
   Building2,
   ExternalLink,
+  BrainCircuit,
+  Sparkles,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { MetricCard, Card, SectionHeader } from "@/components/ui/Card";
@@ -86,6 +88,35 @@ export default function OfficialDashboardPage() {
             </Link>
           </div>
         </div>
+
+        {/* AICTE Intelligence Hub Flagship Spotlight */}
+        <Card className="p-4 border-blue-200 bg-gradient-to-r from-blue-50/70 via-white to-slate-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="h-9 w-9 rounded-lg bg-blue-700 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <BrainCircuit className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-bold text-slate-900">
+                  AICTE Intelligence Hub — Flagship Verification Engine
+                </h2>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 uppercase tracking-wider">
+                  Gemini 2.5
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 mt-0.5">
+                Multi-document intelligence, 5 cross-document deterministic checks, and APH 2024–27 regulatory evaluation for security deposit releases.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Link href="/official/intelligence">
+              <Button variant="primary" size="sm" icon={BrainCircuit}>
+                Launch Intelligence Hub
+              </Button>
+            </Link>
+          </div>
+        </Card>
 
         {/* High-priority Action Banner if Discrepancies exist */}
         {metrics?.discrepanciesCount > 0 && (

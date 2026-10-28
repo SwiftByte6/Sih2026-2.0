@@ -23,6 +23,7 @@ import {
   FileCheck2,
   Users,
   Activity,
+  BrainCircuit,
 } from "lucide-react";
 import { getCurrentUser, setCurrentUser, getAllUsers } from "@/lib/dataService";
 import { SimulatedNoticeBanner } from "@/components/ui/Alert";
@@ -52,6 +53,7 @@ export function AppShell({ children, role = "official", title = "", breadcrumbs 
   // Navigation configurations based on role
   const officialNav = [
     { label: "Dashboard", href: "/official/dashboard", icon: LayoutDashboard },
+    { label: "AICTE Intelligence Hub", href: "/official/intelligence", icon: BrainCircuit, badge: "AI" },
     { label: "Verification Queue", href: "/official/verification", icon: CheckCircle2 },
     { label: "Discrepancy Review", href: "/official/discrepancies", icon: AlertTriangle },
     { label: "Workflow Tasks", href: "/official/tasks", icon: FileCheck2 },
@@ -156,7 +158,12 @@ export function AppShell({ children, role = "official", title = "", breadcrumbs 
                       isActive ? "text-blue-700" : "text-slate-400"
                     }`}
                   />
-                  <span>{item.label}</span>
+                  <span className="flex-1">{item.label}</span>
+                  {item.badge && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">
+                      {item.badge}
+                    </span>
+                  )}
                 </Link>
               );
             })}

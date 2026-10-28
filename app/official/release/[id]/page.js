@@ -14,6 +14,8 @@ import {
   Check,
   X,
   ExternalLink,
+  BrainCircuit,
+  Sparkles,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, SectionHeader } from "@/components/ui/Card";
@@ -24,6 +26,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Textarea } from "@/components/ui/Input";
 import { Alert, SimulatedNoticeBanner } from "@/components/ui/Alert";
 import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
+import { IntelligenceHubView } from "@/components/intelligence/IntelligenceHubView";
 import {
   getReleaseRequestById,
   updateClearance,
@@ -61,6 +64,7 @@ function ReleaseDetailContent() {
   const [approvalRemarks, setApprovalRemarks] = useState("");
   const [viewerDoc, setViewerDoc] = useState(null);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
+  const [showIntelligenceHub, setShowIntelligenceHub] = useState(true);
 
   useEffect(() => {
     async function load() {
@@ -263,6 +267,58 @@ function ReleaseDetailContent() {
           <div className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-600">
             <strong>Applicable Regulatory Basis:</strong> {request.applicable_rule_reference}
           </div>
+        </Card>
+
+        {/* AICTE INTELLIGENCE HUB — FLAGSHIP EMBEDDED ENGINE */}
+        <Card className="p-5 border-blue-200 bg-gradient-to-r from-blue-50/40 via-white to-slate-50">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="h-9 w-9 rounded-lg bg-blue-700 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <BrainCircuit className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-bold text-slate-900">
+                    AICTE Intelligence Hub — Gemini Verification & Regulatory Analysis
+                  </h2>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 uppercase tracking-wider">
+                    Flagship
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  Automated multi-document extraction, 5 cross-document deterministic checks, and APH 2024–27 regulatory evaluation for this release case.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Link href="/official/intelligence">
+                <Button variant="secondary" size="sm" icon={ExternalLink}>
+                  Open Full Hub
+                </Button>
+              </Link>
+              <Button
+                variant={showIntelligenceHub ? "secondary" : "primary"}
+                size="sm"
+                icon={BrainCircuit}
+                onClick={() => setShowIntelligenceHub(!showIntelligenceHub)}
+              >
+                {showIntelligenceHub ? "Hide Intelligence Panel" : "Run Case Intelligence"}
+              </Button>
+            </div>
+          </div>
+
+          {showIntelligenceHub && (
+            <div className="mt-6 pt-5 border-t border-slate-200">
+              <IntelligenceHubView
+                initialCaseId={id}
+                embedded={true}
+                onCaseUpdated={async () => {
+                  const fresh = await getReleaseRequestById(id);
+                  if (fresh) setRequest(fresh);
+                }}
+              />
+            </div>
+          )}
         </Card>
 
         {/* 1. STATUTORY CHECKLIST (Clause 6.46 & Affidavit-6) */}
