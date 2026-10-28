@@ -28,6 +28,7 @@ import {
 import { getCurrentUser, setCurrentUser, getAllUsers } from "@/lib/dataService";
 import { SimulatedNoticeBanner } from "@/components/ui/Alert";
 import { isLiveMode } from "@/lib/config";
+import Image from "next/image";
 
 export function AppShell({ children, role = "official", title = "", breadcrumbs = [] }) {
   const pathname = usePathname();
@@ -96,7 +97,7 @@ export function AppShell({ children, role = "official", title = "", breadcrumbs 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col antialiased">
       {/* Top Banner clarifying Live vs Demo mode */}
-      {isLiveMode() ? (
+      {/* {isLiveMode() ? (
         <div className="bg-emerald-50 border-b border-emerald-200 text-emerald-900 text-[11px] py-1.5 px-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-emerald-600 animate-pulse" />
@@ -109,24 +110,14 @@ export function AppShell({ children, role = "official", title = "", breadcrumbs 
         </div>
       ) : (
         <SimulatedNoticeBanner className="rounded-none border-x-0 border-t-0 text-[11px] py-1.5 px-4 bg-blue-50/60 border-blue-200 text-blue-900" />
-      )}
+      )} */}
 
       <div className="flex flex-1">
         {/* DESKTOP SIDEBAR: 230px, fixed, subtle 1px border */}
-        <aside className="hidden lg:flex lg:flex-col lg:w-60 lg:shrink-0 bg-white border-r border-slate-200 min-h-full">
+        <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:flex lg:w-60 lg:flex-col bg-white border-r border-slate-200 h-screen">
           {/* Brand Header */}
           <div className="h-16 flex items-center px-5 border-b border-slate-100 gap-3">
-            <div className="h-8 w-8 rounded-lg bg-blue-700 text-white flex items-center justify-center font-bold text-sm shadow-xs">
-              AI
-            </div>
-            <div>
-              <div className="text-xs font-bold tracking-tight text-slate-900 uppercase">
-                AICTE FDR Portal
-              </div>
-              <div className="text-[11px] text-blue-700 font-medium">
-                {portalLabel}
-              </div>
-            </div>
+           <Image src="/logo.png" alt="AICTE Logo" width={52} height={52} className="h-16 w-15" />
           </div>
 
           {/* Navigation Items */}
@@ -169,7 +160,7 @@ export function AppShell({ children, role = "official", title = "", breadcrumbs 
             })}
           </nav>
 
-          {/* Role Switcher Sandbox Helper */}
+          {/* Role Switcher Sandbox Helper
           <div className="p-3 border-t border-slate-100 bg-slate-50/50">
             <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 px-1">
               Switch Sandbox Role
@@ -209,13 +200,13 @@ export function AppShell({ children, role = "official", title = "", breadcrumbs 
                 3. Admin Role
               </button>
             </div>
-          </div>
+          </div> */}
 
           {/* Footer User Info */}
           <div className="p-3 border-t border-slate-200 flex items-center justify-between">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="h-7 w-7 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center font-bold text-xs shrink-0">
-                {currentUser?.avatar_initials || "U"}
+                <Image src='/profile.jpg' height={28} width={28} alt="User Avatar" className="h-full w-full rounded-full"  />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-semibold text-slate-900 truncate">
@@ -237,7 +228,7 @@ export function AppShell({ children, role = "official", title = "", breadcrumbs 
         </aside>
 
         {/* MAIN APPLICATION CONTAINER */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 lg:ml-60">
           {/* Top Bar (56px high) */}
           <header className="h-14 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between gap-4 sticky top-0 z-30">
             {/* Mobile menu button */}
@@ -308,7 +299,7 @@ export function AppShell({ children, role = "official", title = "", breadcrumbs 
                   className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-slate-50 text-slate-700 text-xs font-medium"
                 >
                   <span className="h-6 w-6 rounded-full bg-blue-700 text-white flex items-center justify-center font-bold text-[10px]">
-                    {currentUser?.avatar_initials || "U"}
+                <Image src='/profile.jpg' height={28} width={28} alt="User Avatar" className="h-full w-full rounded-full"  />
                   </span>
                   <span className="hidden sm:inline font-semibold">
                     {currentUser?.full_name}

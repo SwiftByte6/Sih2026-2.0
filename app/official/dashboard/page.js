@@ -89,36 +89,9 @@ export default function OfficialDashboardPage() {
           </div>
         </div>
 
-        {/* AICTE Intelligence Hub Flagship Spotlight */}
-        <Card className="p-4 border-blue-200 bg-gradient-to-r from-blue-50/70 via-white to-slate-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="h-9 w-9 rounded-lg bg-blue-700 text-white flex items-center justify-center shrink-0 shadow-xs">
-              <BrainCircuit className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-bold text-slate-900">
-                  AICTE Intelligence Hub — Flagship Verification Engine
-                </h2>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 uppercase tracking-wider">
-                  Gemini 2.5
-                </span>
-              </div>
-              <p className="text-xs text-slate-600 mt-0.5">
-                Multi-document intelligence, 5 cross-document deterministic checks, and APH 2024–27 regulatory evaluation for security deposit releases.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Link href="/official/intelligence">
-              <Button variant="primary" size="sm" icon={BrainCircuit}>
-                Launch Intelligence Hub
-              </Button>
-            </Link>
-          </div>
-        </Card>
+      
 
-        {/* High-priority Action Banner if Discrepancies exist */}
+        {/* High-priority Action Banner if Discrepancies exist
         {metrics?.discrepanciesCount > 0 && (
           <Alert
             variant="warning"
@@ -133,7 +106,7 @@ export default function OfficialDashboardPage() {
           >
             {metrics.discrepanciesCount} financial instrument(s) have flagged variances between submitted certificates and simulated core banking responses.
           </Alert>
-        )}
+        )} */}
 
         {/* Financial & Operational Metric Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -142,11 +115,11 @@ export default function OfficialDashboardPage() {
             value={loading ? "..." : metrics?.pendingVerificationCount}
             subtitle="New submissions pending review"
             icon={CheckCircle2}
-            badge={
-              <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                Actionable
-              </span>
-            }
+            // badge={
+            //   <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+            //     Actionable
+            //   </span>
+            // }
           />
 
           <MetricCard
@@ -154,11 +127,11 @@ export default function OfficialDashboardPage() {
             value={loading ? "..." : metrics?.discrepanciesCount}
             subtitle="Mismatches needing decision"
             icon={AlertTriangle}
-            badge={
-              <span className="text-[11px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                Review Required
-              </span>
-            }
+            // badge={
+            //   <span className="text-[11px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+            //     Review Required
+            //   </span>
+            // }
           />
 
           <MetricCard
@@ -166,11 +139,11 @@ export default function OfficialDashboardPage() {
             value={loading ? "..." : metrics?.expiringSoonCount}
             subtitle="Approaching lock-in completion"
             icon={Clock}
-            badge={
-              <span className="text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
-                Maturity Alert
-              </span>
-            }
+            // badge={
+            //   <span className="text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+            //     Maturity Alert
+            //   </span>
+            // }
           />
 
           <MetricCard
@@ -178,11 +151,11 @@ export default function OfficialDashboardPage() {
             value={loading ? "..." : metrics?.activeReleasesCount}
             subtitle="Clause 6.46 multi-cell review"
             icon={FileText}
-            badge={
-              <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
-                Clearances
-              </span>
-            }
+            // badge={
+            //   <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+            //     Clearances
+            //   </span>
+            // }
           />
         </div>
 
@@ -254,12 +227,30 @@ export default function OfficialDashboardPage() {
                     ),
                   },
                   {
+                    header: "Review Priority",
+                    key: "priority",
+                    render: (row) => {
+                      const isHigh = row.verification_status === "ACTION_REQUIRED" || (row.days_to_maturity !== undefined && row.days_to_maturity < 0);
+                      return (
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${
+                            isHigh
+                              ? "bg-red-50 text-red-800 border-red-200"
+                              : "bg-blue-50 text-blue-800 border-blue-200"
+                          }`}
+                        >
+                          {isHigh ? "Critical Issue" : "Standard Review"}
+                        </span>
+                      );
+                    },
+                  },
+                  {
                     header: "Action",
                     align: "right",
                     render: (row) => (
                       <Link href={`/official/verification/${row.id}`}>
-                        <Button variant="secondary" size="sm">
-                          Verify
+                        <Button variant="primary" size="sm">
+                          Inspect & Verify
                         </Button>
                       </Link>
                     ),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -16,16 +16,28 @@ import {
   Send,
   History,
   Info,
+  Scale,
+  Sparkles,
+  Layers,
+  Check,
+  Edit2,
+  RefreshCw,
+  Clock,
+  ShieldCheck,
+  BookOpen,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, SectionHeader } from "@/components/ui/Card";
 import { Table } from "@/components/ui/Table";
 import { StatusBadge, SimulatedTag } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Modal } from "@/components/ui/Modal";
-import { Textarea } from "@/components/ui/Input";
 import { Alert, SimulatedNoticeBanner } from "@/components/ui/Alert";
-import { PdfViewerModal } from "@/components/ui/PdfViewerModal";
+import { PdfSplitViewer } from "@/components/verification/PdfSplitViewer";
+import { FieldVerificationTable } from "@/components/verification/FieldVerificationTable";
+import { ComplianceIntelligencePanel } from "@/components/verification/ComplianceIntelligencePanel";
+import { OfficerActionModal } from "@/components/verification/OfficerActionModal";
+import { analyzeDiscrepancies } from "@/lib/intelligence/discrepancyEngine";
+import { calculateReviewPriority } from "@/lib/intelligence/riskScoring";
 import {
   getInstrumentById,
   recordVerificationDecision,
@@ -36,7 +48,7 @@ import {
 
 export default function VerificationDetailPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-sm text-slate-500">Loading verification details...</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-sm text-slate-500">Loading verification workspace...</div>}>
       <VerificationDetailContent />
     </Suspense>
   );
@@ -49,23 +61,23 @@ function VerificationDetailContent() {
 
   const [instrument, setInstrument] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("fields"); // fields | compliance | reconciliation | audit
 
-  // Decision Modal State
-  const [decisionModalOpen, setDecisionModalOpen] = useState(false);
-  const [decisionType, setDecisionType] = useState("VERIFY"); // VERIFY | FLAG_DISCREPANCY | REQUEST_INFO | REJECT
-  const [decisionReason, setDecisionReason] = useState("");
+  // PDF Split-Screen & Evidence State
+  const [activeField, setActiveField] = useState(null);
+  const [activeDocumentIndex, setActiveDocumentIndex] = useState(0);
+
+  // Investigation Workflow Action Modal
+  const [actionModalOpen, setActionModalOpen] = useState(false);
+  const [modalActionType, setModalActionType] = useState("REQUEST_CLARIFICATION");
   const [actionSuccessMessage, setActionSuccessMessage] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [viewerDoc, setViewerDoc] = useState(null);
-  const [isViewerOpen, setIsViewerOpen] = useState(false);
+
+  // Officer field overrides / corrections map
+  const [corrections, setCorrections] = useState({});
 
   useEffect(() => {
     async function load() {
       setLoading(true);
-      // BACKEND INTEGRATION:
-      // supabase.from('financial_instruments').select(`
-      //   *, institutions(*), documents(*), verification_requests(*), verification_checks(*), lifecycle_events(*)
-      // `).eq('id', id).single()
       const data = await getInstrumentById(id);
       setInstrument(data);
       setLoading(false);
@@ -73,68 +85,145 @@ function VerificationDetailContent() {
     load();
   }, [id]);
 
-  const handleOpenDecisionModal = (type) => {
-    setDecisionType(type);
-    setDecisionReason("");
-    setDecisionModalOpen(true);
+  // Derived OCR & CBS mocks for comprehensive cross-reconciliation
+  const latestReq = instrument?.verificationRequests?.[0];
+  const cbsData = useMemo(() => {
+    if (!latestReq?.response_summary) {
+      return {
+        fdr_number: instrument?.fdr_number,
+        amount: instrument?.amount,
+        bank_name: instrument?.bank_name,
+        issue_date: instrument?.issue_date,
+        maturity_date: instrument?.maturity_date,
+        lien_holder: "Member Secretary, AICTE",
+        status: "ACTIVE_LIEN_MARKED",
+      };
+    }
+    return latestReq.response_summary;
+  }, [latestReq, instrument]);
+
+  const extractedData = useMemo(() => {
+    return {
+      fdr_number: instrument?.fdr_number || "UBI-FDR-6629104829",
+      bank_name: instrument?.bank_name || "Union Bank of India",
+      bank_branch: instrument?.bank_branch || "Pushp Vihar Branch, New Delhi",
+      bank_ifsc: instrument?.bank_ifsc || "UBIN0000281",
+      amount: instrument?.amount || 3000000,
+      issue_date: instrument?.issue_date || "2016-08-01",
+      maturity_date: instrument?.maturity_date || "2026-08-01",
+      institution_name: instrument?.institution_name || "Delhi Institute of Engineering & Technology",
+      lien_marked: instrument?.lien_marked !== false,
+      lien_details: instrument?.lien_details || "Encumbered in favor of Member Secretary, AICTE, New Delhi",
+      overall_confidence: 0.985,
+      confidence_percentage: "98.5%",
+      document_title: instrument?.documents?.[0]?.original_filename || "FDR_Certificate_Scan.pdf",
+      raw_snippets: [
+        { label: "fdr_number", text: `Fixed Deposit Receipt Certificate No: ${instrument?.fdr_number || "UBI-FDR-6629104829"}` },
+        { label: "amount", text: `Principal Secured Deposit: ₹${(instrument?.amount || 3000000).toLocaleString("en-IN")}` },
+        { label: "lien", text: "Security deposit held under joint lien to Member Secretary, AICTE, New Delhi per Clause 2.25" },
+      ],
+    };
+  }, [instrument]);
+
+  // Deterministic Discrepancy Engine Evaluation
+  const discrepancies = useMemo(() => {
+    if (!instrument) return [];
+    return analyzeDiscrepancies({
+      submitted: instrument,
+      extracted: extractedData,
+      cbs: cbsData,
+      documents: instrument.documents || [],
+    });
+  }, [instrument, extractedData, cbsData]);
+
+  // Explainable Review Prioritization (Triage)
+  const priority = useMemo(() => {
+    if (!instrument) return { level: "LOW", label: "Standard Review", score: 10, reasons: [] };
+    return calculateReviewPriority(instrument, discrepancies);
+  }, [instrument, discrepancies]);
+
+  // Documents list
+  const documentsList = useMemo(() => {
+    if (!instrument) return [];
+    if (instrument.documents && instrument.documents.length > 0) {
+      return instrument.documents;
+    }
+    return [
+      {
+        id: "doc-fdr",
+        original_filename: "FDR_Certificate_Scan.pdf",
+        storage_path: "AICTE_FDR_Demo_PDF_Pack/fdr-001_FDR-2024-ND-001_SIMULATED.pdf",
+        document_type: "FDR_COPY",
+        file_size_bytes: 1420580,
+      },
+      {
+        id: "doc-aff",
+        original_filename: "10_Affidavit_6_Release_Security_Deposit_SIMULATED.pdf",
+        storage_path: "AICTE_FDR_Demo_PDF_Pack/10_Affidavit_6_Release_Security_Deposit_SIMULATED.pdf",
+        document_type: "AFFIDAVIT_6",
+        file_size_bytes: 840200,
+      },
+    ];
+  }, [instrument]);
+
+  const handleOpenActionModal = (type) => {
+    setModalActionType(type);
+    setActionModalOpen(true);
   };
 
-  const handleRecordDecision = async () => {
-    if (!decisionReason.trim()) return;
+  const handleExecuteOfficerAction = async (payload) => {
+    const { actionType, subject, content, reason, decisionType } = payload;
 
-    setIsSubmitting(true);
-    try {
-      const updated = await recordVerificationDecision({
+    let res;
+    if (actionType === "RECORD_DECISION") {
+      res = await recordVerificationDecision({
         instrumentId: id,
         decisionType,
-        reason: decisionReason,
+        reason,
         actorId: "user-official-1",
         actorName: "Dr. Rajesh Sharma",
       });
 
-      setIsSubmitting(false);
-      setDecisionModalOpen(false);
-
-      let msg = "";
-      if (decisionType === "VERIFY") {
-        msg = "Instrument has been officially verified and joint lien confirmed.";
-      } else if (decisionType === "FLAG_DISCREPANCY") {
-        msg = "Discrepancy officially flagged. Institution will be prompted to resolve variance.";
-      } else if (decisionType === "REQUEST_INFO") {
-        msg = "Request for clarification dispatched to institution registrar.";
-      } else if (decisionType === "REJECT") {
-        msg = "Submission rejected with official remarks recorded.";
-      }
-
-      setInstrument(
-        updated || {
-          ...instrument,
-          verification_status:
-            decisionType === "VERIFY"
-              ? "VERIFIED"
-              : decisionType === "FLAG_DISCREPANCY"
-              ? "ACTION_REQUIRED"
-              : decisionType === "REQUEST_INFO"
-              ? "PROCESSING"
-              : "REJECTED",
-          lifecycle_status:
-            decisionType === "VERIFY" ? "ACTIVE" : instrument.lifecycle_status,
-          notes: `Official Decision: ${decisionReason}`,
-        }
+      setActionSuccessMessage(
+        decisionType === "VERIFY"
+          ? "Decision Recorded: Instrument officially verified and joint lien approved."
+          : decisionType === "FLAG_DISCREPANCY"
+          ? "Decision Recorded: Variance officially flagged. Institution will be required to resolve."
+          : "Decision Recorded: Submission rejected with official remarks recorded."
       );
 
-      setActionSuccessMessage(msg);
-    } catch (err) {
-      setIsSubmitting(false);
-      alert(`Error recording verification decision: ${err.message}`);
+      setInstrument((prev) => ({
+        ...prev,
+        verification_status: decisionType === "VERIFY" ? "VERIFIED" : decisionType === "FLAG_DISCREPANCY" ? "ACTION_REQUIRED" : "REJECTED",
+        lifecycle_status: decisionType === "VERIFY" ? "ACTIVE" : prev.lifecycle_status,
+      }));
+    } else if (actionType === "REQUEST_CLARIFICATION") {
+      setActionSuccessMessage(`Official Clarification Dispatched: "${subject}" sent to institution registrar.`);
+      setInstrument((prev) => ({
+        ...prev,
+        verification_status: "ACTION_REQUIRED",
+      }));
+    } else if (actionType === "RESOLVE_DISCREPANCY") {
+      setActionSuccessMessage(`Discrepancy Marked Resolved: ${reason}`);
+    } else if (actionType === "ADD_INTERNAL_NOTE") {
+      setActionSuccessMessage("Internal review note saved to immutable officer audit trail.");
     }
+  };
+
+  const handleSaveFieldCorrection = ({ fieldId, value, reason }) => {
+    setCorrections((prev) => ({
+      ...prev,
+      [fieldId]: { value, reason, timestamp: new Date().toISOString() },
+    }));
+    setActionSuccessMessage(`Field ${fieldId} updated to "${value}". Logged to audit trail.`);
   };
 
   if (loading) {
     return (
       <AppShell role="official">
-        <div className="py-20 text-center text-slate-500 text-sm animate-pulse">
-          Loading 3-way instrument verification data...
+        <div className="py-24 text-center text-slate-500 text-sm space-y-3">
+          <RefreshCw className="h-6 w-6 animate-spin mx-auto text-blue-700" />
+          <p className="font-semibold text-slate-700">Loading AICTE Verification Workspace...</p>
         </div>
       </AppShell>
     );
@@ -143,10 +232,10 @@ function VerificationDetailContent() {
   if (!instrument) {
     return (
       <AppShell role="official">
-        <div className="py-20 text-center text-slate-600">
-          <h2 className="text-lg font-bold text-slate-800">Instrument Record Not Found</h2>
-          <p className="text-xs text-slate-500 mt-1">The requested FDR reference could not be located.</p>
-          <Link href="/official/verification" className="mt-4 inline-block">
+        <div className="py-24 text-center text-slate-500 text-sm space-y-4">
+          <AlertCircle className="h-8 w-8 text-red-600 mx-auto" />
+          <p className="font-bold text-slate-800 text-base">Instrument record not found.</p>
+          <Link href="/official/verification">
             <Button variant="secondary" size="sm">
               Return to Verification Queue
             </Button>
@@ -156,7 +245,8 @@ function VerificationDetailContent() {
     );
   }
 
-  const latestReq = instrument.verificationRequests?.[0];
+  const criticalCount = discrepancies.filter((d) => d.severity === "CRITICAL").length;
+  const pendingCount = discrepancies.filter((d) => d.status !== "Resolved").length;
 
   return (
     <AppShell
@@ -164,450 +254,500 @@ function VerificationDetailContent() {
       breadcrumbs={[
         { label: "Dashboard", href: "/official/dashboard" },
         { label: "Verification Queue", href: "/official/verification" },
-        { label: instrument.instrument_reference },
+        { label: instrument.instrument_reference || "Instrument Workspace" },
       ]}
     >
-      <div className="space-y-6">
-        {/* Back Link & Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <Link
-              href="/official/verification"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 mb-2 transition-colors"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              <span>Back to Verification Queue</span>
-            </Link>
+      <div className="space-y-5">
+        {/* TOP NAVIGATION & ACTIONS */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1 border-b border-slate-200">
+          <Link
+            href="/official/verification"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>Back to Queue</span>
+          </Link>
 
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900 font-mono">
-                {instrument.instrument_reference}
-              </h1>
-              <StatusBadge status={instrument.verification_status} type="verification" />
-              <StatusBadge status={instrument.lifecycle_status} type="lifecycle" />
-              <SimulatedTag />
-            </div>
-            <p className="text-xs text-slate-500 mt-1">
-              {instrument.institution?.institution_name} • AICTE ID: {instrument.institution?.aicte_institution_id}
-            </p>
-          </div>
-
-          {/* Action Buttons for Reviewer */}
+          {/* Quick Officer Actions */}
           <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => handleOpenDecisionModal("REQUEST_INFO")}
+              icon={Send}
+              onClick={() => handleOpenActionModal("REQUEST_CLARIFICATION")}
             >
               Request Clarification
             </Button>
             <Button
-              variant="destructive-outline"
+              variant="secondary"
               size="sm"
-              onClick={() => handleOpenDecisionModal("FLAG_DISCREPANCY")}
+              icon={FileText}
+              onClick={() => handleOpenActionModal("ADD_INTERNAL_NOTE")}
             >
-              Flag Discrepancy
+              Internal Note
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={Check}
+              onClick={() => handleOpenActionModal("RESOLVE_DISCREPANCY")}
+            >
+              Resolve Issue
             </Button>
             <Button
               variant="primary"
               size="sm"
               icon={CheckCircle2}
-              onClick={() => handleOpenDecisionModal("VERIFY")}
+              onClick={() => handleOpenActionModal("RECORD_DECISION")}
             >
-              Approve Verification
+              Record Decision
             </Button>
           </div>
         </div>
 
-        {/* Success Feedback Alert */}
+        {/* FEEDBACK SUCCESS ALERT */}
         {actionSuccessMessage && (
-          <Alert variant="success" title="Decision Recorded">
+          <Alert variant="success" title="Action Completed">
             {actionSuccessMessage}
           </Alert>
         )}
 
-        {/* Important Regulatory Banner */}
-        <SimulatedNoticeBanner message="Bank CBS integration response is simulated sandbox data. Note: Bank API errors (timeouts) must NOT be treated as invalid FDRs; OCR output is supportive evidence requiring officer confirmation." />
+        {/* =========================================================================
+            SECTION 2.A: HEADER & CASE SUMMARY
+            ========================================================================= */}
+        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+            <div>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <span className="font-mono text-sm font-bold text-slate-900 bg-slate-100 px-2.5 py-0.5 rounded border border-slate-200">
+                  {instrument.instrument_reference || "FDR-2024-ND-001"}
+                </span>
+                <span className="text-slate-300">•</span>
+                <h1 className="text-lg font-bold text-slate-900">
+                  {instrument.institution_name}
+                </h1>
+                <span className="text-xs text-slate-500 font-mono">
+                  (AICTE ID: {instrument.aicte_institution_id})
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                {instrument.purpose || "Mandatory Security Deposit under AICTE Approval Process Handbook Clause 1.12 / 2.25"}
+              </p>
+            </div>
 
-        {/* 3-WAY RECONCILIATION COMPARISON GRID */}
-        <div>
-          <div className="mb-3">
-            <h2 className="text-base font-bold text-slate-900">
-              3-Way Reconciliation Comparison
-            </h2>
-            <p className="text-xs text-slate-500">
-              Cross-verifying submitted institution claims against extracted OCR certificate data and simulated Core Banking System (CBS) records.
-            </p>
+            {/* Status & Review Priority Badges */}
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge status={instrument.verification_status} type="verification" />
+              <StatusBadge status={instrument.lifecycle_status} type="lifecycle" />
+              <div className={`px-2.5 py-1 rounded-md border text-xs font-bold flex items-center gap-1.5 ${priority.badgeClasses}`}>
+                <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
+                <span>{priority.label}</span>
+              </div>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            
-            {/* COLUMN 1: Submitted Institution Data */}
-            <Card className="p-5 border-slate-300">
-              <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
-                <span className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-blue-600" />
-                  1. Institution Submission
-                </span>
-                <span className="text-[11px] text-slate-400 font-mono">Claimed</span>
-              </div>
+          {/* KPI Metrics Row: Extraction Quality vs Compliance Separation */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 text-xs">
+            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200/60">
+              <span className="text-[11px] text-slate-400 block font-medium">Secured Amount</span>
+              <span className="text-base font-bold text-slate-900 font-tabular-nums mt-0.5 block">
+                {formatINR(instrument.amount)}
+              </span>
+            </div>
 
-              <div className="space-y-3 text-xs">
-                <div>
-                  <span className="text-slate-400 block text-[11px]">FDR Number</span>
-                  <span className="font-semibold text-slate-900 font-mono">
-                    {instrument.fdr_number}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[11px]">Secured Amount</span>
-                  <span className="font-bold text-slate-900 text-sm font-tabular-nums">
-                    {formatINR(instrument.amount)}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[11px]">Bank & Branch</span>
-                  <span className="font-semibold text-slate-800">
-                    {instrument.bank_name}
-                  </span>
-                  <div className="text-[11px] text-slate-500 truncate">{instrument.bank_branch}</div>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <span className="text-slate-400 block text-[11px]">Issue Date</span>
-                    <span className="font-semibold text-slate-800 font-tabular-nums">
-                      {formatDate(instrument.issue_date)}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[11px]">Maturity Date</span>
-                    <span className="font-semibold text-slate-800 font-tabular-nums">
-                      {formatDate(instrument.maturity_date)}
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[11px]">Joint Lien Declaration</span>
-                  <span className="font-semibold text-emerald-700 flex items-center gap-1">
-                    <CheckCircle2 className="h-3 w-3" />
-                    Claimed in favor of AICTE
-                  </span>
-                </div>
-              </div>
-            </Card>
+            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200/60">
+              <span className="text-[11px] text-slate-400 block font-medium">Scheduled Bank</span>
+              <span className="font-semibold text-slate-900 mt-0.5 block truncate" title={instrument.bank_name}>
+                {instrument.bank_name}
+              </span>
+            </div>
 
-            {/* COLUMN 2: OCR Extracted Document Data */}
-            <Card className="p-5 border-slate-300">
-              <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
-                <span className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-purple-600" />
-                  2. Document Extraction (OCR)
+            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200/60">
+              <span className="text-[11px] text-slate-400 block font-medium">Extraction Quality</span>
+              <div className="flex items-center gap-1 mt-0.5">
+                <span className="font-bold text-blue-700 font-tabular-nums text-sm">
+                  {extractedData.confidence_percentage}
                 </span>
-                <span className="text-[11px] text-purple-700 font-semibold bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
-                  98.4% Confidence
-                </span>
+                <span className="text-[10px] text-slate-400">(AI OCR)</span>
               </div>
+            </div>
 
-              <div className="space-y-3 text-xs">
-                <div>
-                  <span className="text-slate-400 block text-[11px]">Extracted FDR Number</span>
-                  <span className="font-semibold text-slate-900 font-mono">
-                    {instrument.fdr_number}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[11px]">Extracted Amount</span>
-                  <span className="font-bold text-slate-900 text-sm font-tabular-nums">
-                    {formatINR(instrument.amount)}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[11px]">Extracted Bank</span>
-                  <span className="font-semibold text-slate-800">
-                    {instrument.bank_name}
-                  </span>
-                  <div className="text-[11px] text-slate-500 font-mono">IFSC: {instrument.bank_ifsc}</div>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <span className="text-slate-400 block text-[11px]">Extracted Issue Date</span>
-                    <span className="font-semibold text-slate-800 font-tabular-nums">
-                      {formatDate(instrument.issue_date)}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[11px]">Extracted Maturity</span>
-                    <span className="font-semibold text-slate-800 font-tabular-nums">
-                      {formatDate(instrument.maturity_date)}
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[11px]">Supporting PDF Document</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const doc = instrument.documents?.[0] || {
-                        original_filename: "FDR_Receipt_Scan.pdf",
-                        storage_path: `instruments/${instrument.institution_id}/${instrument.id}/receipt.pdf`,
-                      };
-                      setViewerDoc(doc);
-                      setIsViewerOpen(true);
-                    }}
-                    className="font-semibold text-blue-700 hover:text-blue-900 hover:underline flex items-center gap-1 cursor-pointer text-left"
-                  >
-                    <FileText className="h-3 w-3 shrink-0" />
-                    <span className="truncate">{instrument.documents?.[0]?.original_filename || "FDR_Receipt_Scan.pdf"}</span>
-                  </button>
-                </div>
+            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200/60">
+              <span className="text-[11px] text-slate-400 block font-medium">Critical Issues</span>
+              <span className={`font-bold text-sm mt-0.5 block ${criticalCount > 0 ? "text-red-700" : "text-emerald-700"}`}>
+                {criticalCount} Critical Mismatch
+              </span>
+            </div>
+
+            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200/60">
+              <span className="text-[11px] text-slate-400 block font-medium">Pending Checks</span>
+              <span className="font-bold text-slate-900 text-sm mt-0.5 block">
+                {pendingCount} Pending Action
+              </span>
+            </div>
+
+            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200/60">
+              <span className="text-[11px] text-slate-400 block font-medium">Assigned Officer</span>
+              <span className="font-semibold text-slate-900 mt-0.5 block truncate">
+                {instrument.assigned_reviewer || "Dr. Rajesh Sharma"}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* =========================================================================
+            SECTION 2.B: DISCREPANCY OVERVIEW PANEL
+            ========================================================================= */}
+        {discrepancies.length > 0 && (
+          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <h3 className="text-sm font-bold text-slate-900">
+                  Detected Discrepancies & Variances ({discrepancies.length})
+                </h3>
               </div>
-            </Card>
+              <span className="text-[11px] text-slate-500">
+                Rule: High OCR confidence does not override detected discrepancies.
+              </span>
+            </div>
 
-            {/* COLUMN 3: Simulated Bank Core Banking System Response */}
-            <Card className="p-5 border-slate-300">
-              <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
-                <span className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-emerald-600" />
-                  3. Bank CBS Response
-                </span>
-                <span className="text-[11px] text-slate-500 font-medium">
-                  {latestReq?.status === "SUCCEEDED" ? "Connected (342ms)" : latestReq?.status || "Connected"}
-                </span>
-              </div>
-
-              {latestReq?.status === "FAILED" ? (
-                <div className="py-4">
-                  <Alert variant="error" title="External Bank API Error">
-                    {latestReq.error_message || "Gateway Timed Out (504)."}
-                    <div className="mt-2 text-[11px] text-slate-600 font-medium">
-                      Per Section 3 Rules: This API failure is a system connectivity fault, NOT proof of an invalid FDR. Scheduled retry is active.
-                    </div>
-                  </Alert>
-                </div>
-              ) : (
-                <div className="space-y-3 text-xs">
-                  <div>
-                    <span className="text-slate-400 block text-[11px]">CBS Ledger FDR Reference</span>
-                    <span className="font-semibold text-slate-900 font-mono">
-                      {latestReq?.response_summary?.fdr_number || instrument.fdr_number}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[11px]">CBS Principal Amount</span>
-                    <span className="font-bold text-slate-900 text-sm font-tabular-nums">
-                      {formatINR(latestReq?.response_summary?.amount || instrument.amount)}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[11px]">Lien Encumbrance Holder</span>
-                    <span className="font-semibold text-slate-800">
-                      {latestReq?.response_summary?.lien_holder || "Member Secretary, AICTE"}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <span className="text-slate-400 block text-[11px]">CBS Issue Date</span>
+            <div className="space-y-2.5">
+              {discrepancies.map((disc) => (
+                <div
+                  key={disc.id}
+                  className={`p-3.5 rounded-lg border text-xs flex flex-col md:flex-row md:items-center justify-between gap-3 ${
+                    disc.severity === "CRITICAL"
+                      ? "bg-red-50/50 border-red-200 text-red-950"
+                      : disc.severity === "HIGH"
+                      ? "bg-orange-50/50 border-orange-200 text-orange-950"
+                      : "bg-amber-50/40 border-amber-200 text-amber-950"
+                  }`}
+                >
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span
-                        className={`font-semibold font-tabular-nums ${
-                          latestReq?.response_summary?.issue_date &&
-                          latestReq?.response_summary?.issue_date !== instrument.issue_date
-                            ? "text-red-700 bg-red-50 px-1 rounded"
-                            : "text-slate-800"
+                        className={`px-2 py-0.2 rounded font-bold text-[10px] ${
+                          disc.severity === "CRITICAL"
+                            ? "bg-red-200 text-red-900"
+                            : disc.severity === "HIGH"
+                            ? "bg-orange-200 text-orange-900"
+                            : "bg-amber-200 text-amber-900"
                         }`}
                       >
-                        {formatDate(latestReq?.response_summary?.issue_date || instrument.issue_date)}
+                        {disc.severity}
+                      </span>
+                      <strong className="text-slate-900">{disc.field}:</strong>
+                      <span className="font-semibold">{disc.reason}</span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-600 pt-0.5 font-mono">
+                      <span>Submitted: <strong>{disc.submitted_value}</strong></span>
+                      <span>•</span>
+                      <span>Extracted: <strong>{disc.extracted_value}</strong></span>
+                      {disc.cbs_value !== "N/A" && (
+                        <>
+                          <span>•</span>
+                          <span>CBS Ledger: <strong>{disc.cbs_value}</strong></span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Actions on this discrepancy */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        setActiveField({
+                          id: disc.id,
+                          label: disc.field,
+                          confidence: "High",
+                          evidence_snippet: disc.evidence_snippet,
+                          source_page: disc.source_page || 1,
+                        });
+                      }}
+                    >
+                      Inspect in PDF
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => handleOpenActionModal("RESOLVE_DISCREPANCY")}
+                    >
+                      Resolve with Reason
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* =========================================================================
+            SECTION 2.D: SPLIT-SCREEN VERIFICATION WORKSPACE
+            ========================================================================= */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+          
+          {/* LEFT PANEL: PDF Evidence Viewer (5 cols) */}
+          <div className="lg:col-span-5 h-[750px] sticky top-4">
+            <PdfSplitViewer
+              documents={documentsList}
+              activeField={activeField}
+              activeDocumentIndex={activeDocumentIndex}
+              onSelectDocument={setActiveDocumentIndex}
+              className="h-full"
+            />
+          </div>
+
+          {/* RIGHT PANEL: Workspace Tabs (7 cols) */}
+          <div className="lg:col-span-7 space-y-4">
+            
+            {/* Workspace Navigation Tabs */}
+            <div className="bg-white border border-slate-200 rounded-xl p-1.5 shadow-xs flex items-center gap-1 overflow-x-auto text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setActiveTab("fields")}
+                className={`py-2 px-3.5 rounded-lg transition-colors cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                  activeTab === "fields"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                <FileText className="h-3.5 w-3.5" />
+                <span>Field-by-Field Verification (11)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab("compliance")}
+                className={`py-2 px-3.5 rounded-lg transition-colors cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                  activeTab === "compliance"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                <Scale className="h-3.5 w-3.5" />
+                <span>AICTE Handbook Compliance</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab("reconciliation")}
+                className={`py-2 px-3.5 rounded-lg transition-colors cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                  activeTab === "reconciliation"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                <Layers className="h-3.5 w-3.5" />
+                <span>3-Way Reconciliation</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab("audit")}
+                className={`py-2 px-3.5 rounded-lg transition-colors cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                  activeTab === "audit"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                <History className="h-3.5 w-3.5" />
+                <span>Audit Trail ({instrument.lifecycleEvents?.length || 3})</span>
+              </button>
+            </div>
+
+            {/* TAB 1: FIELD-BY-FIELD VERIFICATION */}
+            {activeTab === "fields" && (
+              <FieldVerificationTable
+                submitted={instrument}
+                extracted={extractedData}
+                discrepancies={discrepancies}
+                activeField={activeField}
+                onSelectField={setActiveField}
+                onSaveCorrection={handleSaveFieldCorrection}
+              />
+            )}
+
+            {/* TAB 2: AICTE COMPLIANCE INTELLIGENCE */}
+            {activeTab === "compliance" && (
+              <ComplianceIntelligencePanel
+                instrument={instrument}
+                extracted={extractedData}
+                discrepancies={discrepancies}
+              />
+            )}
+
+            {/* TAB 3: 3-WAY RECONCILIATION */}
+            {activeTab === "reconciliation" && (
+              <div className="space-y-4">
+                <SimulatedNoticeBanner message="Bank CBS integration response is simulated sandbox data. Note: Bank API errors (timeouts) must NOT be treated as invalid FDRs; OCR output is supportive evidence requiring officer confirmation." />
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  {/* Col 1 */}
+                  <Card className="p-4 border-slate-300 space-y-2.5">
+                    <span className="text-[11px] font-bold text-slate-900 uppercase tracking-wider block border-b pb-2">
+                      1. Institution Submission
+                    </span>
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">FDR Number:</span>
+                      <span className="font-mono font-bold text-slate-900">{instrument.fdr_number}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Secured Amount:</span>
+                      <span className="font-bold text-slate-900">{formatINR(instrument.amount)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Bank & Branch:</span>
+                      <span className="font-semibold text-slate-800">{instrument.bank_name}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Dates:</span>
+                      <span>{formatDate(instrument.issue_date)} → {formatDate(instrument.maturity_date)}</span>
+                    </div>
+                  </Card>
+
+                  {/* Col 2 */}
+                  <Card className="p-4 border-blue-200 bg-blue-50/20 space-y-2.5">
+                    <div className="flex items-center justify-between border-b border-blue-100 pb-2">
+                      <span className="text-[11px] font-bold text-blue-900 uppercase tracking-wider block">
+                        2. AI Document OCR Extraction
+                      </span>
+                      <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-1.5 py-0.2 rounded">
+                        {extractedData.confidence_percentage}
                       </span>
                     </div>
                     <div>
-                      <span className="text-slate-400 block text-[11px]">CBS Maturity Date</span>
-                      <span className="font-semibold text-slate-800 font-tabular-nums">
-                        {formatDate(latestReq?.response_summary?.maturity_date || instrument.maturity_date)}
+                      <span className="text-slate-400 block text-[10px]">Extracted FDR No:</span>
+                      <span className="font-mono font-bold text-slate-900">{extractedData.fdr_number}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Extracted Amount:</span>
+                      <span className="font-bold text-slate-900">{formatINR(extractedData.amount)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Extracted Bank:</span>
+                      <span className="font-semibold text-slate-800">{extractedData.bank_name}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Extracted Dates:</span>
+                      <span>{formatDate(extractedData.issue_date)} → {formatDate(extractedData.maturity_date)}</span>
+                    </div>
+                  </Card>
+
+                  {/* Col 3 */}
+                  <Card className="p-4 border-slate-300 space-y-2.5">
+                    <div className="flex items-center justify-between border-b pb-2">
+                      <span className="text-[11px] font-bold text-slate-900 uppercase tracking-wider block">
+                        3. Core Banking Response
+                      </span>
+                      <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 px-1 rounded">
+                        CBS Succeeded
                       </span>
                     </div>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[11px]">Account Status in Bank</span>
-                    <span className="font-semibold text-emerald-700 flex items-center gap-1">
-                      <CheckCircle2 className="h-3 w-3" />
-                      {latestReq?.response_summary?.account_status || "ACTIVE_LIEN_MARKED"}
-                    </span>
-                  </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">CBS Ledger Reference:</span>
+                      <span className="font-mono font-bold text-slate-900">{cbsData.fdr_number}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">CBS Balance:</span>
+                      <span className="font-bold text-slate-900">{formatINR(cbsData.amount)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Lien Holder:</span>
+                      <span className="font-semibold text-slate-800">{cbsData.lien_holder}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">CBS Dates:</span>
+                      <span>{formatDate(cbsData.issue_date)} → {formatDate(cbsData.maturity_date)}</span>
+                    </div>
+                  </Card>
                 </div>
-              )}
-            </Card>
+              </div>
+            )}
+
+            {/* TAB 4: AUDIT TRAIL */}
+            {activeTab === "audit" && (
+              <div className="space-y-3">
+                <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+                  <Table
+                    data={instrument.lifecycleEvents || [
+                      {
+                        event_type: "SUBMISSION_RECEIVED",
+                        event_date: instrument.created_at,
+                        performed_by_name: instrument.created_by_name || "Institution Registrar",
+                        notes: "FDR registration submitted through technical institution portal.",
+                      },
+                      {
+                        event_type: "AI_OCR_SCAN_COMPLETED",
+                        event_date: instrument.created_at,
+                        performed_by_name: "AI Document Intelligence Engine",
+                        notes: "Document intelligence pass completed with 98.5% confidence.",
+                      },
+                      {
+                        event_type: "OFFICER_WORKSPACE_OPENED",
+                        event_date: new Date().toISOString(),
+                        performed_by_name: "Dr. Rajesh Sharma",
+                        notes: "Verification workspace accessed for scrutiny under Clause 2.25.",
+                      },
+                    ]}
+                    columns={[
+                      {
+                        header: "Event",
+                        key: "event_type",
+                        render: (row) => (
+                          <span className="font-mono font-semibold text-slate-800 text-[11px]">
+                            {row.event_type}
+                          </span>
+                        ),
+                      },
+                      {
+                        header: "Actor",
+                        key: "performed_by_name",
+                        render: (row) => (
+                          <span className="text-slate-700 text-xs">
+                            {row.performed_by_name}
+                          </span>
+                        ),
+                      },
+                      {
+                        header: "Details / Audit Reason",
+                        key: "notes",
+                        render: (row) => (
+                          <span className="text-slate-600 text-xs">
+                            {row.notes}
+                          </span>
+                        ),
+                      },
+                      {
+                        header: "Timestamp",
+                        key: "event_date",
+                        render: (row) => (
+                          <span className="text-slate-400 text-[11px] font-mono">
+                            {formatDateTime(row.event_date)}
+                          </span>
+                        ),
+                      },
+                    ]}
+                  />
+                </div>
+              </div>
+            )}
 
           </div>
         </div>
 
-        {/* VERIFICATION RULES CHECK MATRIX */}
-        <Card className="p-5">
-          <SectionHeader
-            title="Automated Rule Verification Matrix"
-            description="Field-by-field consistency checks generated by the verification pipeline"
-          />
-
-          <Table
-            data={instrument.verificationChecks || []}
-            columns={[
-              {
-                header: "Check Rule",
-                key: "check_type",
-                render: (row) => (
-                  <div className="font-semibold text-slate-900 text-xs font-mono">
-                    {row.check_type}
-                  </div>
-                ),
-              },
-              {
-                header: "Result",
-                key: "status",
-                render: (row) => (
-                  <StatusBadge status={row.status} type="check" size="sm" />
-                ),
-              },
-              {
-                header: "Submitted / Expected",
-                key: "expected_value",
-                render: (row) => (
-                  <span className="font-mono text-xs text-slate-700">
-                    {String(row.expected_value)}
-                  </span>
-                ),
-              },
-              {
-                header: "Observed / Bank Record",
-                key: "observed_value",
-                render: (row) => (
-                  <span
-                    className={`font-mono text-xs font-medium ${
-                      row.status === "FAIL"
-                        ? "text-red-700 bg-red-50 px-1 py-0.5 rounded"
-                        : "text-slate-700"
-                    }`}
-                  >
-                    {String(row.observed_value)}
-                  </span>
-                ),
-              },
-              {
-                header: "Verification Finding & Notes",
-                key: "message",
-                render: (row) => (
-                  <div className="text-xs text-slate-600 max-w-md">
-                    {row.message}
-                  </div>
-                ),
-              },
-            ]}
-          />
-        </Card>
-
-        {/* LIFECYCLE AUDIT TRAIL */}
-        <Card className="p-5">
-          <SectionHeader
-            title="Instrument Lifecycle & Decision History"
-            description="Immutable sequence of recorded submission events and official actions"
-          />
-
-          <div className="space-y-3">
-            {instrument.lifecycleEvents?.map((event) => (
-              <div
-                key={event.id}
-                className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
-              >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-slate-900 font-mono">
-                      {event.event_type}
-                    </span>
-                    <span className="text-xs text-slate-400">•</span>
-                    <span className="text-xs text-slate-500">
-                      Actor: {event.actor_name}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-600 mt-0.5">
-                    {event.reason}
-                  </p>
-                </div>
-                <div className="text-right shrink-0">
-                  <span className="text-[11px] text-slate-400 font-tabular-nums">
-                    {formatDateTime(event.event_date)}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        {/* DECISION ACTION MODAL */}
-        <Modal
-          isOpen={decisionModalOpen}
-          onClose={() => setDecisionModalOpen(false)}
-          title={
-            decisionType === "VERIFY"
-              ? "Official Verification Approval"
-              : decisionType === "FLAG_DISCREPANCY"
-              ? "Flag Discrepancy Exception"
-              : decisionType === "REQUEST_INFO"
-              ? "Request Clarification from Institution"
-              : "Reject Instrument Submission"
-          }
-          description="Enter your official findings and mandatory justification. This action is permanently recorded in the audit trail."
-          footer={
-            <>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setDecisionModalOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant={
-                  decisionType === "REJECT" || decisionType === "FLAG_DISCREPANCY"
-                    ? "destructive"
-                    : "primary"
-                }
-                size="sm"
-                loading={isSubmitting}
-                disabled={!decisionReason.trim()}
-                onClick={handleRecordDecision}
-              >
-                Confirm & Record Decision
-              </Button>
-            </>
-          }
-        >
-          <div className="space-y-4">
-            <div className="text-xs text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-200">
-              <span className="font-semibold text-slate-900 block mb-1">
-                Instrument: {instrument.instrument_reference} ({instrument.fdr_number})
-              </span>
-              Secured Amount: {formatINR(instrument.amount)} • Bank: {instrument.bank_name}
-            </div>
-
-            <Textarea
-              label="Official Decision Justification & Remarks"
-              required
-              rows={4}
-              value={decisionReason}
-              onChange={(e) => setDecisionReason(e.target.value)}
-              placeholder="e.g. Verified against Core Banking Ledger; joint lien in favor of Member Secretary AICTE confirmed..."
-              helpText="Mandatory per statutory audit requirements."
-            />
-          </div>
-        </Modal>
-
-        {/* PDF Document Preview Modal */}
-        <PdfViewerModal
-          isOpen={isViewerOpen}
-          onClose={() => {
-            setIsViewerOpen(false);
-            setViewerDoc(null);
-          }}
-          document={viewerDoc}
+        {/* OFFICER ACTION INVESTIGATION MODAL */}
+        <OfficerActionModal
+          isOpen={actionModalOpen}
+          onClose={() => setActionModalOpen(false)}
+          actionType={modalActionType}
+          instrument={instrument}
+          discrepancies={discrepancies}
+          onExecuteAction={handleExecuteOfficerAction}
         />
-
       </div>
     </AppShell>
   );

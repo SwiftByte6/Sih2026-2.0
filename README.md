@@ -1,5 +1,5 @@
 # AICTE Security Deposit & Fixed Deposit Receipt (FDR) Management Portal
-## Flagship Feature: AICTE Intelligence Hub — Gemini-Powered FDR Verification
+## Flagship Feature: AICTE Intelligence Hub — Automated AI Document Verification
 
 > **Project:** AICTE Security Deposit & FDR Management Portal (Smart India Hackathon - SIH)  
 > **Status:** Production-Ready & SIH Demonstration Flagship  
@@ -14,7 +14,7 @@ The **AICTE Security Deposit & FDR Management Portal** digitizes, automates, rec
 
 ### Flagship Innovation: AICTE Intelligence Hub
 The **AICTE Intelligence Hub** is the central verification and regulatory intelligence engine of the application. It brings together:
-1. **Gemini Document Intelligence (`@google/genai`):** Server-side multimodal extraction for technical institution PDF documents (FDR Certificates, notarized Affidavit-6, Letter of Approval / Extension of Approval, and release request letters) with structured field extraction, page/location coordinates, and field confidence indicators.
+1. **Multi-Modal Document Intelligence:** Server-side multimodal extraction for technical institution PDF documents (FDR Certificates, notarized Affidavit-6, Letter of Approval / Extension of Approval, and release request letters) with structured field extraction, page/location coordinates, and field confidence indicators.
 2. **Deterministic Cross-Document Verification:** Objective, server-side cross-checks comparing claimed values against extracted certificate evidence and case records across 5 standard verification checks.
 3. **Regulatory Rules Engine:** Grounded strictly in the statutory provisions of the **AICTE Approval Process Handbook 2024–25 to 2026–27**:
    - **Clause 2.25 (Page 31):** Mandatory security deposit term, joint encumbrance in favor of Member Secretary AICTE, and timeline enforcement.
@@ -67,9 +67,9 @@ The portal includes 3 repeatable, pre-configured test scenarios based on synthet
 
 ### Live AI vs. Seeded Demo Mode Indicator
 The application clearly labels the execution engine:
-- **`Google Gemini 2.5 Flash (Live AI Analysis)`:** Active when `GEMINI_API_KEY` is configured and live document parsing is triggered.
+- **`AI Document Intelligence (Live Analysis)`:** Active when API key is configured and live document parsing is triggered.
 - **`Simulated Demo Intelligence Engine (Seeded Fixture Scenario)`:** Active in offline demo mode, showing pre-computed verified fixtures with explicit sandbox tags.
-- **Zero Silent Fallback:** If Gemini API fails (rate limit, timeout, or invalid credentials), the application displays an explicit error alert with retry options; it never silently presents mock findings as live AI analysis.
+- **Zero Silent Fallback:** If the AI service fails (rate limit, timeout, or invalid credentials), the application displays an explicit error alert with retry options; it never silently presents mock findings as live AI analysis.
 
 ---
 
@@ -93,7 +93,7 @@ Outcome representations:
 
 ## 5. Domain & Security Invariants
 
-1. **AI Supportive Evidence Rule:** Gemini document extractions and confidence scores represent supportive verification data; human official authorization and multi-cell clearances are strictly mandatory for deposit release.
+1. **AI Supportive Evidence Rule:** Document extractions and confidence scores represent supportive verification data; human official authorization and multi-cell clearances are strictly mandatory for deposit release.
 2. **Never Auto-Release:** Reaching maturity or obtaining clean AI analysis **never** triggers automated fund release, renewal, or NOC authorization.
 3. **Bank API Timeout Rule:** External bank API gateway timeouts (HTTP 504) or communication errors are treated strictly as integration errors—**never as evidence that an FDR is invalid**.
 4. **Server-Side API Keys:** `GEMINI_API_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are strictly confined to server-side code and route handlers. They are never exposed to browser bundles or client responses.

@@ -12,6 +12,11 @@ import {
   ArrowRight,
   RefreshCw,
   ExternalLink,
+  Upload,
+  Send,
+  Download,
+  ShieldCheck,
+  Check,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { MetricCard, Card, SectionHeader } from "@/components/ui/Card";
@@ -19,12 +24,15 @@ import { Table } from "@/components/ui/Table";
 import { StatusBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
+import { Modal } from "@/components/ui/Modal";
+import { Textarea } from "@/components/ui/Input";
 import {
   getDashboardMetrics,
   getInstruments,
   getNotifications,
   formatINR,
   formatDate,
+  formatDateTime,
 } from "@/lib/dataService";
 
 export default function InstitutionDashboardPage() {
@@ -33,26 +41,61 @@ export default function InstitutionDashboardPage() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Clarification / Document Replacement Modal State
+  const [clarificationModalOpen, setClarificationModalOpen] = useState(false);
+  const [selectedInstrument, setSelectedInstrument] = useState(null);
+  const [responseText, setResponseText] = useState("");
+  const [isSubmittingResponse, setIsSubmittingResponse] = useState(false);
+  const [responseSuccessMsg, setResponseSuccessMsg] = useState("");
+
   // Institution scope: Delhi Institute of Engineering & Technology (inst-001)
   const institutionId = "inst-001";
 
   useEffect(() => {
     async function load() {
       setLoading(true);
-      // BACKEND INTEGRATION:
-      // Scoped query for authenticated institution user:
-      // supabase.from('financial_instruments').select('*').eq('institution_id', user.institution_id)
       const m = await getDashboardMetrics("institution", institutionId);
-      const instData = await getInstruments({ institution_id: institutionId, pageSize: 5 });
+      const instData = await getInstruments({ institution_id: institutionId, pageSize: 6 });
       const notifs = await getNotifications("institution_admin");
 
       setMetrics(m);
       setMyInstruments(instData.items);
-      setNotifications(notifs.slice(0, 3));
+      setNotifications(notifs.slice(0, 4));
       setLoading(false);
     }
     load();
   }, []);
+
+  const handleOpenClarificationModal = (inst) => {
+    setSelectedInstrument(inst);
+    setResponseText("");
+    setClarificationModalOpen(true);
+  };
+
+  const handleSendClarification = async () => {
+    if (!responseText.trim()) return;
+    setIsSubmittingResponse(true);
+    setTimeout(() => {
+      setIsSubmittingResponse(false);
+      setClarificationModalOpen(false);
+      setResponseSuccessMsg(
+        `Clarification submitted for ${selectedInstrument?.instrument_reference}. AICTE Officer notified for re-scrutiny.`
+      );
+    }, 600);
+  };
+
+  const handleDownloadSummary = () => {
+    const content = `AICTE SECURITY DEPOSIT & FDR COMPLIANCE REPORT\nInstitution: Delhi Institute of Engineering & Technology (1-109283741)\nDate: ${new Date().toLocaleDateString()}\nTotal Instruments: ${myInstruments.length}\nTotal Secured Amount: ₹${metrics?.totalSecuredAmount?.toLocaleString("en-IN") || "50,00,000"}\n\nInstruments:\n` +
+      myInstruments.map((inst) => `- ${inst.instrument_reference} | ${inst.bank_name} | ₹${inst.amount.toLocaleString("en-IN")} | Maturity: ${inst.maturity_date} | Status: ${inst.verification_status}`).join("\n");
+
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `AICTE_FDR_Compliance_Summary_${institutionId}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <AppShell
@@ -63,41 +106,57 @@ export default function InstitutionDashboardPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              Delhi Institute of Engineering & Technology
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+                Delhi Institute of Engineering & Technology
+              </h1>
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                Accredited / Approved
+              </span>
+            </div>
             <p className="text-xs text-slate-500 mt-1">
-              AICTE Permanent Institute ID: <strong className="text-slate-800 font-mono">1-109283741</strong> • Northern Region
+              AICTE Permanent Institute ID: <strong className="text-slate-800 font-mono">1-109283741</strong> • Northern Region (New Delhi)
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={Download}
+              onClick={handleDownloadSummary}
+            >
+              Export Report
+            </Button>
             <Link href="/institution/instruments/new">
               <Button size="sm" icon={PlusCircle}>
                 Submit New FDR
               </Button>
             </Link>
-            <Link href="/institution/release">
-              <Button variant="secondary" size="sm">
-                Apply for Release
-              </Button>
-            </Link>
           </div>
         </div>
+
+        {responseSuccessMsg && (
+          <Alert variant="success" title="Clarification Dispatched">
+            {responseSuccessMsg}
+          </Alert>
+        )}
 
         {/* Action Required Banner if Discrepancies exist */}
         {metrics?.discrepanciesCount > 0 && (
           <Alert
             variant="warning"
-            title="Action Required: Discrepancy Flagged by Verification Officer"
+            title="Action Required: Discrepancy Flagged by AICTE Officer"
             action={
-              <Link href="/institution/instruments/fdr-002">
-                <Button variant="secondary" size="sm">
-                  View Issue Details
-                </Button>
-              </Link>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => handleOpenClarificationModal(myInstruments.find((i) => i.id === "fdr-002") || myInstruments[0])}
+              >
+                Respond to Clarification
+              </Button>
             }
           >
-            FDR-2024-ND-002 (PNB FDR) has a flagged issue date variance between your submitted certificate and the bank verification response. Please provide clarification.
+            FDR-2024-ND-002 (PNB FDR ₹15 Lakh) has an issue date variance flagged during officer verification. Please submit bank confirmation or upload rectified document.
           </Alert>
         )}
 
@@ -183,22 +242,31 @@ export default function InstitutionDashboardPage() {
                     ),
                   },
                   {
-                    header: "Amount",
+                    header: "Secured Amount",
                     key: "amount",
                     align: "right",
                     render: (row) => (
-                      <span className="font-bold text-slate-900 text-xs font-tabular-nums">
+                      <span className="text-xs font-bold text-slate-900 font-tabular-nums">
                         {formatINR(row.amount)}
                       </span>
                     ),
                   },
                   {
-                    header: "Maturity",
+                    header: "Maturity Date",
                     key: "maturity_date",
                     render: (row) => (
-                      <span className="text-xs text-slate-700 font-tabular-nums">
-                        {formatDate(row.maturity_date)}
-                      </span>
+                      <div>
+                        <div className="text-xs font-medium text-slate-700 font-tabular-nums">
+                          {formatDate(row.maturity_date)}
+                        </div>
+                        <div className="text-[11px] text-slate-400">
+                          {row.days_to_maturity !== undefined
+                            ? row.days_to_maturity > 0
+                              ? `${row.days_to_maturity}d left`
+                              : `${Math.abs(row.days_to_maturity)}d matured`
+                            : "—"}
+                        </div>
+                      </div>
                     ),
                   },
                   {
@@ -212,52 +280,181 @@ export default function InstitutionDashboardPage() {
                     header: "Action",
                     align: "right",
                     render: (row) => (
-                      <Link href={`/institution/instruments/${row.id}`}>
-                        <Button variant="secondary" size="sm">
-                          Details
-                        </Button>
-                      </Link>
+                      <div className="flex items-center justify-end gap-1.5">
+                        {row.verification_status === "ACTION_REQUIRED" ? (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => handleOpenClarificationModal(row)}
+                          >
+                            Resolve Issue
+                          </Button>
+                        ) : (
+                          <Link href={`/institution/instruments/${row.id}`}>
+                            <Button variant="secondary" size="sm">
+                              Inspect
+                            </Button>
+                          </Link>
+                        )}
+                      </div>
                     ),
                   },
                 ]}
               />
             </Card>
+
+            {/* Statutory Maturity Alerts (Clause 6.46 90-Day Tracker) */}
+            <Card className="p-5">
+              <SectionHeader
+                title="Statutory Lock-in & Maturity Tracking (Clause 6.46)"
+                description="Mandatory 90/60/30-day alerts for maturing instruments requiring renewal or refund application"
+              />
+
+              <div className="space-y-3 pt-1">
+                {myInstruments
+                  .filter((inst) => inst.days_to_maturity !== undefined && inst.days_to_maturity < 180)
+                  .map((inst) => (
+                    <div
+                      key={inst.id}
+                      className="p-3.5 rounded-lg border border-slate-200 bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 bg-blue-100 text-blue-700 rounded-lg shrink-0 mt-0.5">
+                          <Clock className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-900 font-mono">
+                              {inst.instrument_reference}
+                            </span>
+                            <span className="text-slate-400">•</span>
+                            <span className="font-semibold text-slate-800">
+                              {inst.bank_name} ({formatINR(inst.amount)})
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            Maturity: <strong className="text-slate-700">{formatDate(inst.maturity_date)}</strong> • {inst.days_to_maturity > 0 ? `${inst.days_to_maturity} days remaining` : `${Math.abs(inst.days_to_maturity)} days elapsed since maturity boundary`}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {inst.days_to_maturity <= 0 ? (
+                          <Link href="/institution/release">
+                            <Button variant="primary" size="sm">
+                              Apply for Release (Affidavit-6)
+                            </Button>
+                          </Link>
+                        ) : (
+                          <Link href="/institution/renewals">
+                            <Button variant="secondary" size="sm">
+                              Initiate Term Renewal
+                            </Button>
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </Card>
           </div>
 
-          {/* Side Notifications & Statutory Tips */}
+          {/* Right Column: Regulatory Notifications & Officer Messages */}
           <div className="space-y-6">
             <Card className="p-5">
               <SectionHeader
-                title="Council Notifications"
-                description="Official alerts for your institution"
+                title="Council Inquiries & Notices"
+                description="Communications from AICTE Verification Bureaus"
               />
 
-              <div className="space-y-3">
+              <div className="space-y-3 text-xs">
                 {notifications.map((notif) => (
                   <div
                     key={notif.id}
-                    className="p-3 rounded-lg border border-slate-200 bg-slate-50/50 text-xs"
+                    className="p-3 rounded-lg border border-slate-200 bg-white hover:border-blue-300 transition-colors space-y-1"
                   >
-                    <div className="font-semibold text-slate-900">{notif.title}</div>
-                    <p className="text-slate-600 mt-0.5">{notif.body}</p>
-                    <span className="text-[11px] text-slate-400 mt-1 block">
-                      {formatDate(notif.created_at)}
-                    </span>
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-slate-900 text-[11px]">
+                        {notif.title}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        {formatDateTime(notif.created_at)}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      {notif.message}
+                    </p>
                   </div>
                 ))}
               </div>
             </Card>
 
-            <Card className="p-5 bg-blue-50/30 border-blue-200">
-              <h3 className="text-xs font-bold text-blue-900 uppercase tracking-wider mb-2">
-                Mandatory Regulatory Guidelines
-              </h3>
-              <p className="text-xs text-blue-950/80 leading-relaxed">
-                Security deposits must be kept jointly encumbered with AICTE throughout the prescribed regulatory period. Ensure renewals are submitted at least 30 days prior to maturity to prevent compliance lapses.
+            <Card className="p-5 bg-blue-50/40 border-blue-200">
+              <div className="flex items-center gap-2 mb-2">
+                <ShieldCheck className="h-4 w-4 text-blue-700" />
+                <h3 className="text-xs font-bold text-blue-900">
+                  AICTE Handbook Regulations Notice
+                </h3>
+              </div>
+              <p className="text-[11px] text-blue-800 leading-relaxed">
+                Under Clause 2.25, security deposits must remain continuously lien-marked to the Member Secretary, AICTE throughout the 5 or 10-year term. Premature encashment without Council approval constitutes an automatic withdrawal violation.
               </p>
             </Card>
           </div>
         </div>
+
+        {/* College Administrator Clarification Response Modal */}
+        {clarificationModalOpen && (
+          <Modal
+            isOpen={clarificationModalOpen}
+            onClose={() => setClarificationModalOpen(false)}
+            maxWidth="max-w-xl"
+            title={`Respond to AICTE Clarification Notice: ${selectedInstrument?.instrument_reference}`}
+            description="Submit official institutional clarification or bank branch confirmation regarding the flagged variance."
+            footer={
+              <>
+                <Button variant="secondary" size="sm" onClick={() => setClarificationModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  loading={isSubmittingResponse}
+                  onClick={handleSendClarification}
+                  icon={Send}
+                >
+                  Submit Clarification to AICTE
+                </Button>
+              </>
+            }
+          >
+            <div className="space-y-4 text-xs">
+              <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-amber-950">
+                <span className="font-bold block text-[11px]">Officer Variance Notice:</span>
+                <p className="mt-0.5 text-[11px]">
+                  {selectedInstrument?.notes || "Variance noted between certificate issue date and bank CBS ledger. Official confirmation requested."}
+                </p>
+              </div>
+
+              <Textarea
+                label="Institution Official Clarification Response"
+                required
+                rows={5}
+                value={responseText}
+                onChange={(e) => setResponseText(e.target.value)}
+                placeholder="e.g. Respectfully submitted: The deposit certificate was re-issued by Punjab National Bank Saket Branch on 2024-03-15 following branch CBS system upgrade. Attached please find the branch manager certificate confirming original deposit validity."
+              />
+
+              <div className="p-3 border border-dashed border-slate-300 rounded-lg text-center cursor-pointer hover:bg-slate-50 transition-colors">
+                <Upload className="h-4 w-4 text-slate-400 mx-auto mb-1" />
+                <span className="text-slate-700 font-semibold text-[11px] block">
+                  Attach Supporting Letter from Bank Branch Manager (PDF)
+                </span>
+                <span className="text-[10px] text-slate-400">Optional supporting proof (up to 10 MB)</span>
+              </div>
+            </div>
+          </Modal>
+        )}
       </div>
     </AppShell>
   );

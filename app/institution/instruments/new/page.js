@@ -13,6 +13,12 @@ import {
   Building2,
   Lock,
   RefreshCw,
+  Sparkles,
+  Check,
+  AlertTriangle,
+  ScanText,
+  ShieldCheck,
+  ExternalLink,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, SectionHeader } from "@/components/ui/Card";
@@ -25,6 +31,7 @@ export default function NewInstrumentPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const fileInputRef = useRef(null);
+  const quickFileInputRef = useRef(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -42,12 +49,17 @@ export default function NewInstrumentPage() {
     signatory_designation: "Registrar & Authorized Signatory",
   });
 
-  // Real Document Upload & OCR state
+  // Real Document Upload & Document OCR state
   const [uploadedFile, setUploadedFile] = useState(null);
   const [fileError, setFileError] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [isExtractingOcr, setIsExtractingOcr] = useState(false);
   const [ocrCompleted, setOcrCompleted] = useState(false);
+  const [ocrData, setOcrData] = useState(null);
+  const [ocrError, setOcrError] = useState("");
+  const [hasAutofilled, setHasAutofilled] = useState(false);
+  const [autofillSuccessNotice, setAutofillSuccessNotice] = useState("");
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionSuccess, setSubmissionSuccess] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -56,17 +68,23 @@ export default function NewInstrumentPage() {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const processSelectedFile = (file) => {
+  /**
+   * Sends the uploaded document to Automated OCR endpoint
+   * Extracts real fields, authentic confidence scores, and lien status
+   */
+  const processSelectedFile = async (file) => {
     if (!file) return;
     setFileError("");
     setSubmitError("");
+    setOcrError("");
+    setAutofillSuccessNotice("");
 
-    // 1. Validate PDF file type strictly
-    const isPdf =
-      (file.type && file.type === "application/pdf") ||
-      (file.name && file.name.toLowerCase().endsWith(".pdf"));
-    if (!isPdf) {
-      setFileError("Invalid file type. Only PDF documents (.pdf) are permitted.");
+    // 1. Validate file type (PDF or scanned image)
+    const isAllowed =
+      (file.type && (file.type === "application/pdf" || file.type.startsWith("image/"))) ||
+      (file.name && /\.(pdf|png|jpe?g|webp)$/i.test(file.name));
+    if (!isAllowed) {
+      setFileError("Invalid file type. Please upload a PDF document (.pdf) or scanned image (.png, .jpg, .jpeg).");
       return;
     }
 
@@ -79,10 +97,33 @@ export default function NewInstrumentPage() {
 
     setUploadedFile(file);
     setIsExtractingOcr(true);
-    setTimeout(() => {
-      setIsExtractingOcr(false);
+    setOcrCompleted(false);
+    setOcrData(null);
+    setHasAutofilled(false);
+
+    try {
+      const uploadPayload = new FormData();
+      uploadPayload.append("file", file);
+
+      const response = await fetch("/api/intelligence/ocr-fdr", {
+        method: "POST",
+        body: uploadPayload,
+      });
+
+      const resJson = await response.json();
+
+      if (!response.ok || !resJson.success) {
+        throw new Error(resJson.error || "Failed to parse document with AI Document Intelligence.");
+      }
+
+      setOcrData(resJson.data);
       setOcrCompleted(true);
-    }, 600);
+    } catch (err) {
+      console.error("[NewInstrument OCR] Extraction error:", err);
+      setOcrError(err.message || "Failed to process document with AI Document OCR.");
+    } finally {
+      setIsExtractingOcr(false);
+    }
   };
 
   const handleFileChange = (e) => {
@@ -90,6 +131,38 @@ export default function NewInstrumentPage() {
     if (file) {
       processSelectedFile(file);
     }
+  };
+
+  /**
+   * Applies all OCR extracted fields into the form
+   */
+  const handleApplyOcrToForm = () => {
+    if (!ocrData) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      ...(ocrData.bank_name ? { bank_name: ocrData.bank_name } : {}),
+      ...(ocrData.bank_branch ? { bank_branch: ocrData.bank_branch } : {}),
+      ...(ocrData.bank_ifsc ? { bank_ifsc: ocrData.bank_ifsc } : {}),
+      ...(ocrData.fdr_number ? { fdr_number: ocrData.fdr_number } : {}),
+      ...(ocrData.amount ? { amount: String(ocrData.amount) } : {}),
+      ...(ocrData.issue_date ? { issue_date: ocrData.issue_date } : {}),
+      ...(ocrData.maturity_date ? { maturity_date: ocrData.maturity_date } : {}),
+      ...(ocrData.lien_marked !== undefined ? { lien_marked: Boolean(ocrData.lien_marked) } : {}),
+      ...(ocrData.lien_details ? { lien_details: ocrData.lien_details } : {}),
+      ...(ocrData.signatory_name ? { signatory_name: ocrData.signatory_name } : {}),
+      ...(ocrData.signatory_designation ? { signatory_designation: ocrData.signatory_designation } : {}),
+    }));
+
+    setHasAutofilled(true);
+    setAutofillSuccessNotice("Form successfully updated with details extracted by Automated Document OCR.");
+  };
+
+  /**
+   * Applies an individual field from OCR into the form
+   */
+  const handleApplySingleField = (field, value) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleFinalSubmit = async (e) => {
@@ -109,6 +182,39 @@ export default function NewInstrumentPage() {
       setSubmitError(err.message || "Failed to submit instrument record.");
       setIsSubmitting(false);
     }
+  };
+
+  // Helper for confidence badge colors
+  const getConfidenceBadge = (score) => {
+    const num = typeof score === "number" ? score : parseFloat(score) || 0;
+    const pct = (num <= 1 ? num * 100 : num).toFixed(1) + "%";
+
+    if (num >= 0.9 || num >= 90) {
+      return {
+        text: `Confidence: ${pct}`,
+        classes: "bg-emerald-50 text-emerald-800 border-emerald-200",
+        rating: "High Accuracy",
+      };
+    }
+    if (num >= 0.75 || num >= 75) {
+      return {
+        text: `Confidence: ${pct}`,
+        classes: "bg-blue-50 text-blue-800 border-blue-200",
+        rating: "Good",
+      };
+    }
+    if (num >= 0.5 || num >= 50) {
+      return {
+        text: `Confidence: ${pct}`,
+        classes: "bg-amber-50 text-amber-800 border-amber-200",
+        rating: "Moderate",
+      };
+    }
+    return {
+      text: `Confidence: ${pct}`,
+      classes: "bg-rose-50 text-rose-800 border-rose-200",
+      rating: "Low / Manual Check",
+    };
   };
 
   return (
@@ -148,9 +254,11 @@ export default function NewInstrumentPage() {
               { num: 3, label: "Document & OCR Scan" },
               { num: 4, label: "Review & Submit" },
             ].map((step) => (
-              <div
+              <button
                 key={step.num}
-                className={`py-2 px-3 rounded-lg border transition-colors ${
+                type="button"
+                onClick={() => setCurrentStep(step.num)}
+                className={`py-2 px-3 rounded-lg border text-left sm:text-center transition-colors cursor-pointer ${
                   currentStep === step.num
                     ? "bg-blue-50 border-blue-300 text-blue-800 font-bold"
                     : currentStep > step.num
@@ -161,8 +269,8 @@ export default function NewInstrumentPage() {
                 <span className="block text-[11px] uppercase tracking-wider">
                   Step {step.num}
                 </span>
-                <span className="truncate">{step.label}</span>
-              </div>
+                <span className="truncate block">{step.label}</span>
+              </button>
             ))}
           </div>
         </div>
@@ -181,6 +289,44 @@ export default function NewInstrumentPage() {
               description="Provide exact details as stated on the bank deposit certificate"
             />
 
+            {/* Quick AI Extraction Prompt */}
+            <div className="mb-6 p-4 rounded-xl bg-blue-50/60 border border-blue-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-blue-100 text-blue-700 mt-0.5">
+                  <Sparkles className="h-4 w-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-blue-900">
+                    Accelerate Submission with Automated Document OCR
+                  </h4>
+                  <p className="text-[11px] text-blue-700 mt-0.5 leading-relaxed">
+                    Upload your scanned FDR certificate or Affidavit-6 PDF. The AI Intelligence engine will instantly extract the certificate number, issuing bank, branch, amount, dates, and lien status to auto-fill this form.
+                  </p>
+                </div>
+              </div>
+              <div className="shrink-0">
+                <input
+                  type="file"
+                  ref={quickFileInputRef}
+                  accept=".pdf,application/pdf,image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    handleFileChange(e);
+                    setCurrentStep(3); // Jump to OCR Step
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  icon={Upload}
+                  onClick={() => quickFileInputRef.current?.click()}
+                >
+                  Upload & Auto-Fill
+                </Button>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Select
                 label="Scheduled Bank Name"
@@ -192,9 +338,13 @@ export default function NewInstrumentPage() {
                   { value: "Punjab National Bank", label: "Punjab National Bank" },
                   { value: "Canara Bank", label: "Canara Bank" },
                   { value: "Bank of Baroda", label: "Bank of Baroda" },
+                  { value: "Union Bank of India", label: "Union Bank of India" },
                   { value: "HDFC Bank", label: "HDFC Bank" },
                   { value: "ICICI Bank", label: "ICICI Bank" },
-                  { value: "Union Bank of India", label: "Union Bank of India" },
+                  { value: "Bank of India", label: "Bank of India" },
+                  { value: "Central Bank of India", label: "Central Bank of India" },
+                  { value: "Axis Bank", label: "Axis Bank" },
+                  { value: "Indian Bank", label: "Indian Bank" },
                 ]}
               />
 
@@ -219,46 +369,55 @@ export default function NewInstrumentPage() {
                 required
                 value={formData.fdr_number}
                 onChange={(e) => handleInputChange("fdr_number", e.target.value)}
-                placeholder="e.g. SBI-FDR-9823410294"
+                placeholder="e.g. SBI-FDR-2026-991823"
               />
 
               <Input
-                label="Principal Secured Amount (INR)"
-                required
+                label="Principal Deposit Amount (₹ INR)"
                 type="number"
+                required
                 value={formData.amount}
                 onChange={(e) => handleInputChange("amount", e.target.value)}
-                placeholder="e.g. 3500000"
-                helpText={`Equivalent to: ${formatINR(parseFloat(formData.amount || 0))}`}
+                placeholder="3500000"
               />
 
+              <div className="flex flex-col justify-center px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg">
+                <span className="text-[11px] text-slate-500 font-medium">Formatted Amount</span>
+                <span className="text-sm font-bold text-slate-900 font-tabular-nums">
+                  {formData.amount && !isNaN(Number(formData.amount))
+                    ? formatINR(parseFloat(formData.amount))
+                    : "₹0"}
+                </span>
+              </div>
+
               <Input
-                label="Date of Issue / Deposit"
-                required
+                label="Issue Date"
                 type="date"
+                required
                 value={formData.issue_date}
                 onChange={(e) => handleInputChange("issue_date", e.target.value)}
               />
 
               <Input
-                label="Maturity Date (Min 5 Years)"
-                required
+                label="Maturity Date (Minimum 5-Year Lock-in)"
                 type="date"
+                required
                 value={formData.maturity_date}
                 onChange={(e) => handleInputChange("maturity_date", e.target.value)}
-                helpText="Mandatory 5-year regulatory lock-in duration under Clause 1.12"
-              />
-
-              <Input
-                label="Deposit Purpose / Approval Category"
-                required
-                value={formData.purpose}
-                onChange={(e) => handleInputChange("purpose", e.target.value)}
-                placeholder="e.g. Clause 1.12 Security Deposit for UG Engineering"
               />
             </div>
 
-            <div className="mt-6 pt-4 border-t border-slate-100 flex justify-end">
+            <div className="mt-4">
+              <Textarea
+                label="Statutory Deposit Purpose"
+                rows={2}
+                value={formData.purpose}
+                onChange={(e) => handleInputChange("purpose", e.target.value)}
+                placeholder="Mandatory Security Deposit under Clause 1.12 for UG Engineering Program"
+              />
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-end">
               <Button onClick={() => setCurrentStep(2)} icon={ArrowRight} iconPosition="right">
                 Next: Joint Lien Declaration
               </Button>
@@ -266,56 +425,51 @@ export default function NewInstrumentPage() {
           </Card>
         )}
 
-        {/* STEP 2: Joint Lien Declaration */}
+        {/* STEP 2: Joint Lien & Signatory */}
         {currentStep === 2 && (
           <Card className="p-6">
             <SectionHeader
-              title="Step 2: Statutory Joint Lien Declaration"
-              description="Declaration of joint encumbrance in favor of the Member Secretary, AICTE"
+              title="Step 2: Regulatory Encumbrance & Authorized Signatory"
+              description="Verify statutory joint lien marking in favor of AICTE per Clause 2.25"
             />
 
             <div className="space-y-4">
-              <div className="p-4 rounded-xl bg-blue-50/50 border border-blue-200 text-xs text-blue-950 space-y-2">
-                <span className="font-bold text-sm block text-blue-900">
-                  Statutory Requirement under AICTE Approval Process Handbook
-                </span>
-                <p className="leading-relaxed">
-                  Fixed Deposit Receipts submitted towards security deposit must be created jointly in the name of the institution and the Member Secretary, AICTE, New Delhi. The bank must register an explicit joint lien, prohibiting unauthorized premature withdrawal or alteration without written AICTE approval.
-                </p>
-              </div>
-
-              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-start gap-3">
-                <input
-                  type="checkbox"
-                  id="lien-check"
-                  checked={formData.lien_marked}
-                  onChange={(e) => handleInputChange("lien_marked", e.target.checked)}
-                  className="mt-1 rounded border-slate-300 text-blue-700 focus:ring-blue-600 h-4 w-4"
-                />
-                <label htmlFor="lien-check" className="text-xs text-slate-800 leading-relaxed cursor-pointer">
-                  <strong className="block text-slate-900">
-                    Formal Joint Lien Registered with Scheduled Bank
-                  </strong>
-                  I hereby declare that the Fixed Deposit Receipt specified herein has been formally encumbered in favor of the Member Secretary, AICTE, New Delhi and the Bank Core Banking System has registered this joint lien restriction.
-                </label>
+              <div className="p-4 rounded-xl border border-blue-200 bg-blue-50/40">
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    id="lien_marked"
+                    checked={formData.lien_marked}
+                    onChange={(e) => handleInputChange("lien_marked", e.target.checked)}
+                    className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-600"
+                  />
+                  <div>
+                    <label htmlFor="lien_marked" className="text-xs font-bold text-slate-900 cursor-pointer">
+                      Mandatory Clause 2.25 Joint Lien Confirmed
+                    </label>
+                    <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
+                      I solemnly confirm this Fixed Deposit Receipt is encumbered jointly with the Member Secretary, AICTE, New Delhi, and cannot be prematurely liquidated or encashed without prior written Council authorization.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <Textarea
-                label="Lien Particulars & Bank Confirmation Remarks"
-                required
-                rows={3}
+                label="Lien Marking Certificate Details"
+                rows={2}
                 value={formData.lien_details}
                 onChange={(e) => handleInputChange("lien_details", e.target.value)}
-                placeholder="Jointly encumbered in favor of Member Secretary, AICTE, New Delhi..."
+                placeholder="Jointly encumbered in favor of Member Secretary, AICTE, New Delhi and Delhi Institute of Engineering & Technology"
               />
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                 <Input
                   label="Authorized Signatory Name"
                   required
                   value={formData.signatory_name}
                   onChange={(e) => handleInputChange("signatory_name", e.target.value)}
                 />
+
                 <Input
                   label="Signatory Designation"
                   required
@@ -336,18 +490,30 @@ export default function NewInstrumentPage() {
           </Card>
         )}
 
-        {/* STEP 3: Document Upload & OCR Scan */}
+        {/* STEP 3: Document Upload & AI OCR Scan */}
         {currentStep === 3 && (
           <Card className="p-6">
             <SectionHeader
-              title="Step 3: Document Upload & Automated Extraction Review"
-              description="Upload scanned deposit certificate. Review extracted fields before final submission."
+              title="Step 3: Document Upload & Automated AI OCR Review"
+              description="Upload official deposit certificate or Affidavit-6 PDF. The AI engine extracts fields and calculates real confidence scores."
             />
 
             <div className="space-y-6">
               {fileError && (
                 <Alert variant="error" title="File Validation Error">
                   {fileError}
+                </Alert>
+              )}
+
+              {ocrError && (
+                <Alert variant="error" title="Document OCR Analysis Notice">
+                  {ocrError}
+                </Alert>
+              )}
+
+              {autofillSuccessNotice && (
+                <Alert variant="success" title="Form Synchronized with OCR">
+                  {autofillSuccessNotice}
                 </Alert>
               )}
 
@@ -374,16 +540,18 @@ export default function NewInstrumentPage() {
                 <input
                   type="file"
                   ref={fileInputRef}
-                  accept=".pdf,application/pdf"
+                  accept=".pdf,application/pdf,image/*"
                   className="hidden"
                   onChange={handleFileChange}
                 />
-                <Upload className="h-8 w-8 text-blue-700 mx-auto mb-2" />
+                <div className="p-3 bg-blue-50 text-blue-700 rounded-full w-fit mx-auto mb-3 border border-blue-100">
+                  <Upload className="h-6 w-6" />
+                </div>
                 <h4 className="text-sm font-semibold text-slate-900">
-                  {uploadedFile ? "Replace FDR Certificate PDF" : "Upload Scanned FDR Certificate PDF"}
+                  {uploadedFile ? "Replace FDR Certificate / Affidavit PDF" : "Upload Scanned FDR Certificate or Affidavit-6"}
                 </h4>
                 <p className="text-xs text-slate-500 mt-1">
-                  Click to browse or drag and drop your official deposit receipt (PDF only, up to 10 MB)
+                  Click to browse or drag and drop official document (PDF, PNG, JPG up to 10 MB)
                 </p>
 
                 <div className="mt-4 flex items-center justify-center gap-3">
@@ -397,69 +565,307 @@ export default function NewInstrumentPage() {
                       fileInputRef.current?.click();
                     }}
                   >
-                    {uploadedFile ? "Choose Different PDF" : "Select PDF Document"}
+                    {uploadedFile ? "Choose Different Document" : "Select Document File"}
                   </Button>
                 </div>
               </div>
 
-              {/* Uploaded File Pill */}
+              {/* Uploaded File Pill with Live Status */}
               {uploadedFile && (
-                <div className="p-3.5 rounded-lg border border-slate-200 bg-white flex items-center justify-between text-xs shadow-xs">
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-2 bg-blue-50 text-blue-700 rounded-lg">
-                      <FileText className="h-4 w-4" />
+                <div className="p-4 rounded-xl border border-slate-200 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-blue-50 text-blue-700 rounded-lg border border-blue-100 shrink-0">
+                      <FileText className="h-5 w-5" />
                     </div>
                     <div>
-                      <span className="font-semibold text-slate-900 block">{uploadedFile.name}</span>
+                      <span className="font-semibold text-slate-900 text-xs block">
+                        {uploadedFile.name}
+                      </span>
                       <span className="text-[11px] text-slate-400">
                         {uploadedFile.size ? `${(uploadedFile.size / 1024 / 1024).toFixed(2)} MB • ` : ""}
                         Ready for Supabase Storage Upload
                       </span>
                     </div>
                   </div>
-                  <span className="text-emerald-700 font-semibold flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded">
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    {ocrCompleted ? "OCR Processed" : "File Attached"}
-                  </span>
+
+                  <div>
+                    {isExtractingOcr ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 animate-pulse">
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                        Running Automated Multi-Modal Document OCR...
+                      </span>
+                    ) : ocrCompleted ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                        OCR Processed (Live AI)
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-500">File Attached</span>
+                    )}
+                  </div>
                 </div>
               )}
 
-              {/* OCR Review Comparison Card */}
-              {ocrCompleted && (
-                <div className="bg-purple-50/40 border border-purple-200 rounded-xl p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-purple-900 uppercase tracking-wider">
-                      OCR Extraction Verification Review
-                    </span>
-                    <span className="text-[11px] font-semibold text-purple-800 bg-purple-100 px-2 py-0.5 rounded">
-                      Confidence: 98.4%
-                    </span>
+              {/* Loading State during OCR Analysis */}
+              {isExtractingOcr && (
+                <div className="p-6 rounded-xl bg-slate-50 border border-slate-200 text-center space-y-2">
+                  <div className="inline-flex p-3 rounded-full bg-blue-50 text-blue-700 mb-1 border border-blue-100 animate-pulse">
+                    <ScanText className="h-6 w-6 animate-spin" />
                   </div>
-
-                  <p className="text-xs text-purple-950">
-                    The extraction engine detected the following fields from your certificate. Confirm they match your entered details.
+                  <h4 className="text-sm font-bold text-slate-900">
+                    Extracting Document Intelligence with Advanced AI Engine
+                  </h4>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto">
+                    Analyzing document typography, certificate number, issuing bank, amounts, dates, and AICTE joint lien declarations...
                   </p>
+                </div>
+              )}
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs pt-1">
-                    <div className="bg-white p-2.5 rounded-lg border border-purple-100">
-                      <span className="text-slate-400 block text-[11px]">Detected FDR No</span>
-                      <span className="font-semibold text-slate-900 font-mono">
-                        {formData.fdr_number}
-                      </span>
+              {/* REAL OCR REVIEW CARD (Compliant with design.md blue aesthetic) */}
+              {ocrCompleted && ocrData && (
+                <div className="bg-white border border-blue-200 rounded-xl p-5 space-y-5 shadow-xs">
+                  {/* Header with Real Confidence Pill */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100">
+                        <Sparkles className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-slate-900 uppercase tracking-wider block">
+                           OCR EXTRACTION VERIFICATION REVIEW
+                        </span>
+                        <span className="text-[11px] text-slate-500">
+                          {ocrData.document_title || "Official Deposit Document"} • Verified by AI Document Intelligence Engine
+                        </span>
+                      </div>
                     </div>
-                    <div className="bg-white p-2.5 rounded-lg border border-purple-100">
-                      <span className="text-slate-400 block text-[11px]">Detected Amount</span>
-                      <span className="font-bold text-slate-900 font-tabular-nums">
-                        {formatINR(parseFloat(formData.amount))}
-                      </span>
-                    </div>
-                    <div className="bg-white p-2.5 rounded-lg border border-purple-100">
-                      <span className="text-slate-400 block text-[11px]">Detected Bank</span>
-                      <span className="font-semibold text-slate-900">
-                        {formData.bank_name}
-                      </span>
+
+                    {/* Real Confidence Score Display */}
+                    <div className="flex items-center gap-2">
+                      {(() => {
+                        const badge = getConfidenceBadge(ocrData.overall_confidence);
+                        return (
+                          <div className={`px-2.5 py-1 rounded-md border text-xs font-bold flex items-center gap-1.5 ${badge.classes}`}>
+                            <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+                            <span>{badge.text}</span>
+                            <span className="text-[10px] font-normal opacity-80">({badge.rating})</span>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
+
+                  {/* Summary & Fetch / Auto-fill Action Bar */}
+                  <div className="p-3.5 rounded-lg bg-blue-50/50 border border-blue-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <span className="text-xs font-bold text-blue-900 block">
+                        Confirm or Synchronize Extracted Values
+                      </span>
+                      <p className="text-[11px] text-blue-700 mt-0.5">
+                        The automated extraction engine detected financial and institutional parameters directly from the document text. Click below to automatically update the form.
+                      </p>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="primary"
+                      size="sm"
+                      icon={hasAutofilled ? Check : Sparkles}
+                      onClick={handleApplyOcrToForm}
+                    >
+                      {hasAutofilled ? "Form Synchronized ✓" : "Fetch & Auto-Fill Form"}
+                    </Button>
+                  </div>
+
+                  {/* Extracted Fields Comparison Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 text-xs">
+                    {/* 1. FDR Number */}
+                    <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/60 flex flex-col justify-between space-y-2">
+                      <div>
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-slate-500 font-medium">Detected FDR No</span>
+                          <span className="font-semibold text-blue-700">
+                            {ocrData.field_confidences?.fdr_number ? `${(ocrData.field_confidences.fdr_number * 100).toFixed(0)}% conf` : "Verified"}
+                          </span>
+                        </div>
+                        <span className="font-bold text-slate-900 font-mono text-sm mt-1 block">
+                          {ocrData.fdr_number || "Not detected"}
+                        </span>
+                      </div>
+                      <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px]">
+                        <span className="text-slate-500">
+                          Form: <strong className="font-mono text-slate-700">{formData.fdr_number}</strong>
+                        </span>
+                        {ocrData.fdr_number && formData.fdr_number !== ocrData.fdr_number ? (
+                          <button
+                            type="button"
+                            onClick={() => handleApplySingleField("fdr_number", ocrData.fdr_number)}
+                            className="text-blue-700 hover:underline font-semibold cursor-pointer"
+                          >
+                            Update
+                          </button>
+                        ) : (
+                          <span className="text-emerald-700 font-semibold flex items-center gap-0.5">
+                            <Check className="h-3 w-3" /> Match
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 2. Deposit Amount */}
+                    <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/60 flex flex-col justify-between space-y-2">
+                      <div>
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-slate-500 font-medium">Detected Amount</span>
+                          <span className="font-semibold text-blue-700">
+                            {ocrData.field_confidences?.amount ? `${(ocrData.field_confidences.amount * 100).toFixed(0)}% conf` : "Verified"}
+                          </span>
+                        </div>
+                        <span className="font-bold text-slate-900 font-tabular-nums text-sm mt-1 block">
+                          {ocrData.amount ? formatINR(ocrData.amount) : "Not detected"}
+                        </span>
+                      </div>
+                      <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px]">
+                        <span className="text-slate-500">
+                          Form: <strong className="font-tabular-nums text-slate-700">{formData.amount ? formatINR(parseFloat(formData.amount)) : "₹0"}</strong>
+                        </span>
+                        {ocrData.amount && Number(formData.amount) !== Number(ocrData.amount) ? (
+                          <button
+                            type="button"
+                            onClick={() => handleApplySingleField("amount", String(ocrData.amount))}
+                            className="text-blue-700 hover:underline font-semibold cursor-pointer"
+                          >
+                            Update
+                          </button>
+                        ) : (
+                          <span className="text-emerald-700 font-semibold flex items-center gap-0.5">
+                            <Check className="h-3 w-3" /> Match
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 3. Bank Name */}
+                    <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/60 flex flex-col justify-between space-y-2">
+                      <div>
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-slate-500 font-medium">Detected Bank</span>
+                          <span className="font-semibold text-blue-700">
+                            {ocrData.field_confidences?.bank_name ? `${(ocrData.field_confidences.bank_name * 100).toFixed(0)}% conf` : "Verified"}
+                          </span>
+                        </div>
+                        <span className="font-bold text-slate-900 text-sm mt-1 block truncate">
+                          {ocrData.bank_name || "Not detected"}
+                        </span>
+                      </div>
+                      <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px]">
+                        <span className="text-slate-500 truncate mr-2">
+                          Form: <strong className="text-slate-700">{formData.bank_name}</strong>
+                        </span>
+                        {ocrData.bank_name && formData.bank_name !== ocrData.bank_name ? (
+                          <button
+                            type="button"
+                            onClick={() => handleApplySingleField("bank_name", ocrData.bank_name)}
+                            className="text-blue-700 hover:underline font-semibold cursor-pointer shrink-0"
+                          >
+                            Update
+                          </button>
+                        ) : (
+                          <span className="text-emerald-700 font-semibold flex items-center gap-0.5 shrink-0">
+                            <Check className="h-3 w-3" /> Match
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 4. Dates */}
+                    <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/60 flex flex-col justify-between space-y-2">
+                      <div>
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-slate-500 font-medium">Detected Dates</span>
+                          <span className="font-semibold text-blue-700">
+                            {ocrData.field_confidences?.dates ? `${(ocrData.field_confidences.dates * 100).toFixed(0)}% conf` : "Verified"}
+                          </span>
+                        </div>
+                        <span className="font-semibold text-slate-800 text-xs mt-1 block font-tabular-nums">
+                          {ocrData.issue_date || "N/A"} → {ocrData.maturity_date || "N/A"}
+                        </span>
+                      </div>
+                      <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px]">
+                        <span className="text-slate-500 font-tabular-nums">
+                          Maturity: <strong>{formData.maturity_date}</strong>
+                        </span>
+                        {ocrData.maturity_date && formData.maturity_date !== ocrData.maturity_date ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (ocrData.issue_date) handleApplySingleField("issue_date", ocrData.issue_date);
+                              if (ocrData.maturity_date) handleApplySingleField("maturity_date", ocrData.maturity_date);
+                            }}
+                            className="text-blue-700 hover:underline font-semibold cursor-pointer"
+                          >
+                            Update
+                          </button>
+                        ) : (
+                          <span className="text-emerald-700 font-semibold flex items-center gap-0.5">
+                            <Check className="h-3 w-3" /> Match
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 5. Joint Lien Encumbrance */}
+                    <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/60 flex flex-col justify-between space-y-2 sm:col-span-2">
+                      <div>
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-slate-500 font-medium">AICTE Joint Lien Status</span>
+                          <span className="font-semibold text-blue-700">
+                            {ocrData.field_confidences?.lien ? `${(ocrData.field_confidences.lien * 100).toFixed(0)}% conf` : "Detected"}
+                          </span>
+                        </div>
+                        <span className="font-semibold text-slate-900 text-xs mt-1 flex items-center gap-1.5">
+                          {ocrData.lien_marked ? (
+                            <span className="text-emerald-700 font-bold flex items-center gap-1">
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              Confirmed Pledged to AICTE (Clause 2.25)
+                            </span>
+                          ) : (
+                            <span className="text-amber-700 font-medium flex items-center gap-1">
+                              <AlertTriangle className="h-3.5 w-3.5" />
+                              Joint lien text not explicitly detected
+                            </span>
+                          )}
+                        </span>
+                        {ocrData.lien_details && (
+                          <p className="text-[11px] text-slate-600 mt-1 italic border-l-2 border-slate-300 pl-2">
+                            &ldquo;{ocrData.lien_details}&rdquo;
+                          </p>
+                        )}
+                      </div>
+                      <div className="pt-2 border-t border-slate-200/60 text-[11px] text-slate-500">
+                        {ocrData.institution_name && (
+                          <span>Depositor: <strong>{ocrData.institution_name}</strong></span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Verbatim Document Snippets from OCR */}
+                  {ocrData.raw_snippets && ocrData.raw_snippets.length > 0 && (
+                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs">
+                      <span className="font-semibold text-slate-700 text-[11px] uppercase tracking-wider block mb-1">
+                        OCR Verbatim Evidence Snippets:
+                      </span>
+                      <div className="space-y-1">
+                        {ocrData.raw_snippets.slice(0, 3).map((snippet, idx) => (
+                          <div key={idx} className="text-[11px] text-slate-600 font-mono bg-white p-1.5 rounded border border-slate-200/60">
+                            <span className="text-slate-400 font-sans mr-1.5">• {snippet.label}:</span>
+                            {snippet.text}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -496,7 +902,9 @@ export default function NewInstrumentPage() {
                   <div className="text-right">
                     <span className="text-slate-400 block text-[11px]">Deposit Amount</span>
                     <span className="text-lg font-bold text-slate-900 font-tabular-nums">
-                      {formatINR(parseFloat(formData.amount))}
+                      {formData.amount && !isNaN(Number(formData.amount))
+                        ? formatINR(parseFloat(formData.amount))
+                        : "₹0"}
                     </span>
                   </div>
                 </div>
@@ -533,13 +941,35 @@ export default function NewInstrumentPage() {
                 </div>
               </div>
 
+              {/* OCR Verification Status Card in Review */}
+              {ocrCompleted && ocrData && (
+                <div className="p-3.5 rounded-xl border border-blue-200 bg-blue-50/40 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-lg bg-blue-100 text-blue-700">
+                      <Sparkles className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <span className="font-bold text-slate-900 block">
+                        Verified with AI Document Intelligence Engine
+                      </span>
+                      <span className="text-[11px] text-slate-600">
+                        {uploadedFile?.name} • Extracted with {getConfidenceBadge(ocrData.overall_confidence).text}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 rounded bg-emerald-100 text-emerald-800 font-bold text-[11px]">
+                    Ready for Official Verification
+                  </span>
+                </div>
+              )}
+
               {submitError && (
                 <Alert variant="error" title="Submission Failed">
                   {submitError}
                 </Alert>
               )}
 
-              <SimulatedNoticeBanner message="Submitting will queue this deposit record for automated dummy bank verification and official review by AICTE North Region Verification Bureau." />
+              <SimulatedNoticeBanner message="Submitting will queue this deposit record for automated 3-way bank reconciliation and official review by AICTE North Region Verification Bureau." />
             </div>
 
             <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">

@@ -279,7 +279,7 @@ function ReleaseDetailContent() {
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="text-sm font-bold text-slate-900">
-                    AICTE Intelligence Hub — Gemini Verification & Regulatory Analysis
+                    AICTE Intelligence Hub — Automated Verification & Regulatory Analysis
                   </h2>
                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 uppercase tracking-wider">
                     Flagship

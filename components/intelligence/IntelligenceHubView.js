@@ -111,7 +111,7 @@ function buildInitialAnalysis(caseId) {
       model: "simulated-aph-fixture-v1",
       duration_ms: 112,
       timestamp: new Date().toISOString(),
-      note: "Seeded demonstration scenario. To run live AI extraction, configure GEMINI_API_KEY in .env.local.",
+      note: "Seeded demonstration scenario. To run live AI extraction, configure API key in .env.local.",
     },
     handbook_metadata: APH_SOURCE_METADATA,
     summary: {
@@ -325,7 +325,7 @@ export function IntelligenceHubView({
                 </h2>
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200 uppercase tracking-wider">
                   <Sparkles className="h-3 w-3 text-blue-600" />
-                  Gemini-Powered
+                  AI-Powered
                 </span>
               </div>
               <p className="text-xs text-slate-600 mt-0.5">
@@ -456,7 +456,7 @@ export function IntelligenceHubView({
             {errorState.note && <p className="text-xs mt-1 text-slate-600">{errorState.note}</p>}
             <div className="mt-3 flex items-center gap-2">
               <Button size="sm" variant="secondary" onClick={() => executeAnalysis(selectedScenario)}>
-                Retry Live Gemini Analysis
+                Retry Live AI Analysis
               </Button>
               <Button
                 size="sm"
@@ -509,7 +509,7 @@ export function IntelligenceHubView({
         <Card className="p-12 text-center text-slate-500">
           <RefreshCw className="h-8 w-8 animate-spin mx-auto text-blue-600 mb-3" />
           <h3 className="text-sm font-bold text-slate-800">
-            Running Gemini Document Intelligence & Regulatory Verification...
+            Running AI Document Intelligence & Regulatory Verification...
           </h3>
           <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
             Extracting structured deposit parameters, executing 5 cross-document deterministic checks, and evaluating compliance against AICTE Handbook Clauses 2.25, 6.46, and 7.7.
@@ -691,7 +691,7 @@ export function IntelligenceHubView({
           {activeTab === "extraction" && (
             <Card className="p-5">
               <SectionHeader
-                title="Structured Gemini Document Extraction Matrix"
+                title="Structured AI Document Extraction Matrix"
                 description="Field-by-field extracted data with source document citations, page/location references, and confidence scores"
               />
 
@@ -955,7 +955,7 @@ export function IntelligenceHubView({
                             INTELLIGENCE_ANALYSIS_EXECUTED
                           </span>
                           <span className="text-[10px] text-emerald-800 font-semibold bg-emerald-50 px-1.5 py-0.2 rounded">
-                            {analysisResult.engine?.model || "Gemini 2.5"}
+                            {analysisResult.engine?.model || "AI Intelligence"}
                           </span>
                         </div>
                         <p className="text-slate-700 mt-0.5">

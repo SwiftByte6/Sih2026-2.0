@@ -68,7 +68,7 @@ export async function POST(request) {
       };
     }
 
-    // 2. Run Document Extraction (Gemini Live or Seeded Demo Fixture)
+    // 2. Run Document Extraction (Live AI or Seeded Demo Fixture)
     const extractionResult = await extractDocumentIntelligence({
       scenarioId: scenario_id,
       pdfFiles: pdf_files,
@@ -85,7 +85,7 @@ export async function POST(request) {
           error_message: extractionResult.error_message,
           timestamp: extractionResult.timestamp,
           duration_ms: extractionResult.duration_ms,
-          note: "Gemini API failure is an external service error, NOT proof that the FDR or release request is invalid. You may switch to Seeded Demonstration Mode or retry.",
+          note: "External AI service failure is an external service error, NOT proof that the FDR or release request is invalid. You may switch to Seeded Demonstration Mode or retry.",
         },
         { status: 502 }
       );
