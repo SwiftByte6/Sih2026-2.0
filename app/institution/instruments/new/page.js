@@ -19,7 +19,7 @@ import { Card, SectionHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input, Select, Textarea } from "@/components/ui/Input";
 import { Alert, SimulatedNoticeBanner } from "@/components/ui/Alert";
-import { formatINR } from "@/lib/dataService";
+import { formatINR, createInstrument } from "@/lib/dataService";
 
 export default function NewInstrumentPage() {
   const router = useRouter();
@@ -50,6 +50,7 @@ export default function NewInstrumentPage() {
   const [ocrCompleted, setOcrCompleted] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionSuccess, setSubmissionSuccess] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -63,25 +64,23 @@ export default function NewInstrumentPage() {
     }, 700);
   };
 
-  const handleFinalSubmit = (e) => {
+  const handleFinalSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setSubmitError("");
 
-    // BACKEND INTEGRATION:
-    // Future Supabase Flow:
-    // 1. Upload file to Supabase private storage bucket: supabase.storage.from('fdr-documents').upload(...)
-    // 2. Insert into public.documents (document_type: 'FDR_COPY', storage_path, file_size_bytes)
-    // 3. Insert into public.financial_instruments (lifecycle_status: 'SUBMITTED', verification_status: 'PENDING_VERIFICATION')
-    // 4. Trigger serverless verification job (call dummy_bank_api and create verification_request)
-    // 5. Insert public.audit_logs entry
-
-    setTimeout(() => {
+    try {
+      await createInstrument(formData, uploadedFile, "11111111-1111-1111-1111-111111111101");
       setIsSubmitting(false);
       setSubmissionSuccess(true);
       setTimeout(() => {
         router.push("/institution/instruments");
       }, 1500);
-    }, 800);
+    } catch (err) {
+      console.error("Submission failed:", err);
+      setSubmitError(err.message || "Failed to submit instrument record.");
+      setIsSubmitting(false);
+    }
   };
 
   return (

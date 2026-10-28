@@ -16,7 +16,11 @@ import { Card, SectionHeader, MetricCard } from "@/components/ui/Card";
 import { Table } from "@/components/ui/Table";
 import { Button } from "@/components/ui/Button";
 import { Alert, SimulatedNoticeBanner } from "@/components/ui/Alert";
-import { getIntegrationLogs, formatDateTime } from "@/lib/dataService";
+import {
+  getIntegrationLogs,
+  triggerBankPingDiagnostic,
+  formatDateTime,
+} from "@/lib/dataService";
 
 export default function IntegrationsPage() {
   const [logs, setLogs] = useState([]);
@@ -26,8 +30,6 @@ export default function IntegrationsPage() {
 
   useEffect(() => {
     async function load() {
-      // BACKEND INTEGRATION:
-      // supabase.from('integration_sync_logs').select('*').order('created_at', { ascending: false })
       const data = await getIntegrationLogs();
       setLogs(data);
       setLoading(false);
@@ -35,15 +37,18 @@ export default function IntegrationsPage() {
     load();
   }, []);
 
-  const handleSimulatePing = () => {
+  const handleSimulatePing = async () => {
     setSimulatingPing(true);
-    // BACKEND INTEGRATION:
-    // Test ping calling external bank verification dummy endpoint
-    setTimeout(() => {
+    try {
+      const newLog = await triggerBankPingDiagnostic({ bankCode: "SBI" });
+      setLogs((prev) => [newLog, ...prev]);
       setSimulatingPing(false);
       setPingSuccess(true);
       setTimeout(() => setPingSuccess(false), 3000);
-    }, 600);
+    } catch (err) {
+      console.error("Diagnostic ping failed:", err);
+      setSimulatingPing(false);
+    }
   };
 
   return (

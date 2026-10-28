@@ -17,7 +17,7 @@ import { Table } from "@/components/ui/Table";
 import { StatusBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input, Select } from "@/components/ui/Input";
-import { getTasks, formatDate } from "@/lib/dataService";
+import { getTasks, updateTaskStatus, formatDate } from "@/lib/dataService";
 
 export default function OfficialTasksPage() {
   const [tasks, setTasks] = useState([]);
@@ -28,8 +28,6 @@ export default function OfficialTasksPage() {
 
   useEffect(() => {
     async function load() {
-      // BACKEND INTEGRATION:
-      // supabase.from('workflow_tasks').select('*').order('due_at', { ascending: true })
       const data = await getTasks({
         status: statusFilter || undefined,
         priority: priorityFilter || undefined,
@@ -41,12 +39,15 @@ export default function OfficialTasksPage() {
     load();
   }, [statusFilter, priorityFilter, search]);
 
-  const handleUpdateTaskStatus = (taskId, newStatus) => {
-    // BACKEND INTEGRATION:
-    // supabase.from('workflow_tasks').update({ status: newStatus, updated_at: new Date() }).eq('id', taskId)
-    setTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t))
-    );
+  const handleUpdateTaskStatus = async (taskId, newStatus) => {
+    try {
+      await updateTaskStatus(taskId, newStatus);
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t))
+      );
+    } catch (err) {
+      console.error("Failed to update task status:", err);
+    }
   };
 
   return (

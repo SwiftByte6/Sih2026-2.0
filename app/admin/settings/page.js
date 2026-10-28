@@ -16,6 +16,7 @@ import { Card, SectionHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input, Select } from "@/components/ui/Input";
 import { Alert, SimulatedNoticeBanner } from "@/components/ui/Alert";
+import { updateSystemSettings } from "@/lib/dataService";
 
 export default function AdminSettingsPage() {
   const [reminders, setReminders] = useState({
@@ -31,18 +32,19 @@ export default function AdminSettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
     setIsSaving(true);
-    // BACKEND INTEGRATION:
-    // supabase.from('system_settings').upsert({ key: 'maturity_thresholds', value: reminders })
-    // + insert into public.audit_logs
 
-    setTimeout(() => {
+    try {
+      await updateSystemSettings(reminders);
       setIsSaving(false);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
-    }, 500);
+    } catch (err) {
+      console.error("Failed to save settings:", err);
+      setIsSaving(false);
+    }
   };
 
   return (

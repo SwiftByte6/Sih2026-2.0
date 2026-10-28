@@ -20,7 +20,12 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Input, Select, Textarea } from "@/components/ui/Input";
 import { Alert, SimulatedNoticeBanner } from "@/components/ui/Alert";
-import { getReleaseRequests, formatINR, formatDate } from "@/lib/dataService";
+import {
+  getReleaseRequests,
+  createReleaseRequest,
+  formatINR,
+  formatDate,
+} from "@/lib/dataService";
 
 export default function InstitutionReleasePage() {
   const [requests, setRequests] = useState([]);
@@ -39,8 +44,6 @@ export default function InstitutionReleasePage() {
 
   useEffect(() => {
     async function load() {
-      // BACKEND INTEGRATION:
-      // supabase.from('release_refund_requests').select('*, financial_instruments(*), clearance_records(*)').eq('institution_id', user.institution_id)
       const data = await getReleaseRequests({ institution_id: institutionId });
       setRequests(data);
       setLoading(false);
@@ -48,35 +51,26 @@ export default function InstitutionReleasePage() {
     load();
   }, [institutionId]);
 
-  const handleCreateReleaseRequest = (e) => {
+  const handleCreateReleaseRequest = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // BACKEND INTEGRATION:
-    // Future Supabase Flow:
-    // 1. Insert into public.release_refund_requests (institution_id, instrument_id, status: 'SUBMITTED', applicable_rule_reference)
-    // 2. Upload and insert documents (document_type: 'AFFIDAVIT_6', 'INSTITUTION_REQUEST_LETTER')
-    // 3. Initialize public.clearance_records (Legal, Approval, Finance, Regional Office in PENDING state)
-    // 4. Update financial_instruments: lifecycle_status = 'RELEASE_PENDING'
-    // 5. Insert audit_logs entry
+    try {
+      const newReq = await createReleaseRequest({
+        institutionId,
+        instrumentId: selectedFdr,
+        requestType: "RELEASE",
+        reason: remarks,
+      });
 
-    setTimeout(() => {
-      setIsSubmitting(false);
-      const newReq = {
-        id: "rel-new",
-        request_reference: "REL-2026-0021",
-        instrument_id: selectedFdr,
-        instrument_reference: "FDR-2016-ND-008",
-        fdr_number: "UBI-FDR-6629104829",
-        amount: 3000000.0,
-        bank_name: "Union Bank of India",
-        request_type: "RELEASE",
-        status: "CLEARANCE_PENDING",
-        submitted_at: new Date().toISOString(),
-        clearances_summary: { total: 4, cleared: 0, pending: 4 },
-      };
       setRequests((prev) => [newReq, ...prev]);
-    }, 600);
+      setSuccessMsg(`Release application filed successfully under reference ${newReq.request_reference}.`);
+      setModalOpen(false);
+    } catch (err) {
+      console.error("Failed to create release request:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

@@ -23,7 +23,14 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Textarea } from "@/components/ui/Input";
 import { Alert, SimulatedNoticeBanner } from "@/components/ui/Alert";
-import { getReleaseRequestById, formatINR, formatDate, formatDateTime } from "@/lib/dataService";
+import {
+  getReleaseRequestById,
+  updateClearance,
+  approveRelease,
+  formatINR,
+  formatDate,
+  formatDateTime,
+} from "@/lib/dataService";
 
 export default function ReleaseDetailPage() {
   return (
@@ -55,8 +62,6 @@ function ReleaseDetailContent() {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      // BACKEND INTEGRATION:
-      // supabase.from('release_refund_requests').select('*, institutions(*), financial_instruments(*), clearance_records(*)').eq('id', id).single()
       const data = await getReleaseRequestById(id);
       setRequest(data);
       setLoading(false);
@@ -71,71 +76,83 @@ function ReleaseDetailContent() {
     setClearanceModalOpen(true);
   };
 
-  const handleResolveClearance = (actionStatus) => {
+  const handleResolveClearance = async (actionStatus) => {
     setIsSubmitting(true);
-    // BACKEND INTEGRATION:
-    // supabase.from('clearance_records').update({
-    //   status: actionStatus,
-    //   reference_number: refNumber,
-    //   remarks: clearanceRemarks,
-    //   resolved_at: new Date()
-    // }).eq('id', selectedClearance.id)
+    try {
+      await updateClearance({
+        clearanceId: selectedClearance.id,
+        status: actionStatus,
+        remarks: clearanceRemarks,
+        refNumber,
+      });
 
-    setTimeout(() => {
+      // Reload fresh data from service
+      const freshData = await getReleaseRequestById(id);
+      if (freshData) {
+        setRequest(freshData);
+      } else {
+        setRequest((prev) => {
+          const updatedClearances = prev.clearances.map((c) =>
+            c.id === selectedClearance.id
+              ? {
+                  ...c,
+                  status: actionStatus,
+                  reference_number: refNumber,
+                  remarks: clearanceRemarks,
+                  resolved_at: new Date().toISOString(),
+                  resolved_by_name: "Dr. Rajesh Sharma",
+                }
+              : c
+          );
+          const allCleared = updatedClearances.every((c) => c.status === "CLEARED");
+          return {
+            ...prev,
+            clearances: updatedClearances,
+            status: allCleared ? "UNDER_REVIEW" : prev.status,
+            clearances_summary: {
+              ...prev.clearances_summary,
+              cleared: updatedClearances.filter((c) => c.status === "CLEARED").length,
+              pending: updatedClearances.filter((c) => c.status === "PENDING").length,
+            },
+          };
+        });
+      }
+    } catch (err) {
+      console.error("Failed to update clearance:", err);
+    } finally {
       setIsSubmitting(false);
       setClearanceModalOpen(false);
-
-      setRequest((prev) => {
-        const updatedClearances = prev.clearances.map((c) =>
-          c.id === selectedClearance.id
-            ? {
-                ...c,
-                status: actionStatus,
-                reference_number: refNumber,
-                remarks: clearanceRemarks,
-                resolved_at: new Date().toISOString(),
-                resolved_by_name: "Dr. Rajesh Sharma",
-              }
-            : c
-        );
-
-        const allCleared = updatedClearances.every((c) => c.status === "CLEARED");
-
-        return {
-          ...prev,
-          clearances: updatedClearances,
-          status: allCleared ? "UNDER_REVIEW" : prev.status,
-          clearances_summary: {
-            ...prev.clearances_summary,
-            cleared: updatedClearances.filter((c) => c.status === "CLEARED").length,
-            pending: updatedClearances.filter((c) => c.status === "PENDING").length,
-          },
-        };
-      });
-    }, 400);
+    }
   };
 
-  const handleApproveRelease = () => {
+  const handleApproveRelease = async () => {
     setIsSubmitting(true);
-    // BACKEND INTEGRATION:
-    // Transaction:
-    // 1. Update release_refund_requests: status = 'COMPLETED', completion_reference = nocNumber, decision_at = now()
-    // 2. Update financial_instruments: lifecycle_status = 'RELEASED'
-    // 3. Insert audit_logs entry
+    try {
+      await approveRelease({
+        releaseRequestId: request.id,
+        nocNumber,
+        remarks: approvalRemarks,
+      });
 
-    setTimeout(() => {
+      const freshData = await getReleaseRequestById(id);
+      if (freshData) {
+        setRequest(freshData);
+      } else {
+        setRequest((prev) => ({
+          ...prev,
+          status: "COMPLETED",
+          completion_reference: nocNumber || `NOC-AICTE-HQ-${Math.floor(10000 + Math.random() * 90000)}`,
+          notes: `Release officially approved. NOC Reference: ${nocNumber}. Remarks: ${approvalRemarks}`,
+          decision_by_name: "Meenakshi Sundaram (Finance Director)",
+          decision_at: new Date().toISOString(),
+        }));
+      }
+    } catch (err) {
+      console.error("Failed to approve release:", err);
+    } finally {
       setIsSubmitting(false);
       setApprovalModalOpen(false);
-
-      setRequest((prev) => ({
-        ...prev,
-        status: "COMPLETED",
-        completion_reference: nocNumber || `NOC-AICTE-HQ-${Math.floor(10000 + Math.random() * 90000)}`,
-        notes: `Release officially approved. NOC Reference: ${nocNumber}. Remarks: ${approvalRemarks}`,
-        decision_by_name: "Meenakshi Sundaram (Finance Director)",
-        decision_at: new Date().toISOString(),
-      }));
-    }, 450);
+    }
   };
 
   if (loading) {

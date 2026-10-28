@@ -25,7 +25,13 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Textarea } from "@/components/ui/Input";
 import { Alert, SimulatedNoticeBanner } from "@/components/ui/Alert";
-import { getInstrumentById, formatINR, formatDate, formatDateTime } from "@/lib/dataService";
+import {
+  getInstrumentById,
+  recordVerificationDecision,
+  formatINR,
+  formatDate,
+  formatDateTime,
+} from "@/lib/dataService";
 
 export default function VerificationDetailPage() {
   return (
@@ -74,45 +80,51 @@ function VerificationDetailContent() {
     if (!decisionReason.trim()) return;
 
     setIsSubmitting(true);
-    // BACKEND INTEGRATION:
-    // Future server-side mutation:
-    // 1. Transaction to update financial_instruments: verification_status, lifecycle_status, notes
-    // 2. Insert into public.lifecycle_events (from_status, to_status, actor_id, reason)
-    // 3. Insert into public.audit_logs (actor_user_id, action, before_data, after_data, reason)
-    // 4. If REQUEST_INFO, insert into public.notifications for institution_admin
+    try {
+      const updated = await recordVerificationDecision({
+        instrumentId: id,
+        decisionType,
+        reason: decisionReason,
+        actorId: "user-official-1",
+        actorName: "Dr. Rajesh Sharma",
+      });
 
-    setTimeout(() => {
       setIsSubmitting(false);
       setDecisionModalOpen(false);
 
-      let newStatus = instrument.verification_status;
-      let newLifecycle = instrument.lifecycle_status;
       let msg = "";
-
       if (decisionType === "VERIFY") {
-        newStatus = "VERIFIED";
-        newLifecycle = "ACTIVE";
         msg = "Instrument has been officially verified and joint lien confirmed.";
       } else if (decisionType === "FLAG_DISCREPANCY") {
-        newStatus = "ACTION_REQUIRED";
         msg = "Discrepancy officially flagged. Institution will be prompted to resolve variance.";
       } else if (decisionType === "REQUEST_INFO") {
-        newStatus = "PROCESSING";
         msg = "Request for clarification dispatched to institution registrar.";
       } else if (decisionType === "REJECT") {
-        newStatus = "REJECTED";
         msg = "Submission rejected with official remarks recorded.";
       }
 
-      setInstrument((prev) => ({
-        ...prev,
-        verification_status: newStatus,
-        lifecycle_status: newLifecycle,
-        notes: `Official Decision: ${decisionReason}`,
-      }));
+      setInstrument(
+        updated || {
+          ...instrument,
+          verification_status:
+            decisionType === "VERIFY"
+              ? "VERIFIED"
+              : decisionType === "FLAG_DISCREPANCY"
+              ? "ACTION_REQUIRED"
+              : decisionType === "REQUEST_INFO"
+              ? "PROCESSING"
+              : "REJECTED",
+          lifecycle_status:
+            decisionType === "VERIFY" ? "ACTIVE" : instrument.lifecycle_status,
+          notes: `Official Decision: ${decisionReason}`,
+        }
+      );
 
       setActionSuccessMessage(msg);
-    }, 500);
+    } catch (err) {
+      setIsSubmitting(false);
+      alert(`Error recording verification decision: ${err.message}`);
+    }
   };
 
   if (loading) {

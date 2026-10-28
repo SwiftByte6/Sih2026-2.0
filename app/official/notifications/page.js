@@ -13,7 +13,12 @@ import {
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, SectionHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { getNotifications, formatDate } from "@/lib/dataService";
+import {
+  getNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+  formatDate,
+} from "@/lib/dataService";
 
 export default function OfficialNotificationsPage() {
   const [notifications, setNotifications] = useState([]);
@@ -22,8 +27,6 @@ export default function OfficialNotificationsPage() {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      // BACKEND INTEGRATION:
-      // supabase.from('notifications').select('*').eq('recipient_user_id', auth.uid()).order('scheduled_for', { ascending: false })
       const data = await getNotifications();
       setNotifications(data);
       setLoading(false);
@@ -31,16 +34,24 @@ export default function OfficialNotificationsPage() {
     load();
   }, []);
 
-  const handleMarkAsRead = (id) => {
-    // BACKEND INTEGRATION:
-    // supabase.from('notifications').update({ read_at: new Date(), status: 'READ' }).eq('id', id)
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
-    );
+  const handleMarkAsRead = async (id) => {
+    try {
+      await markNotificationRead(id);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
+      );
+    } catch (err) {
+      console.error("Failed to mark notification read:", err);
+    }
   };
 
-  const handleMarkAllRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+  const handleMarkAllRead = async () => {
+    try {
+      await markAllNotificationsRead();
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+    } catch (err) {
+      console.error("Failed to mark all notifications read:", err);
+    }
   };
 
   return (

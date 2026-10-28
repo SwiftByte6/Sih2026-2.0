@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { getCurrentUser, setCurrentUser, getAllUsers } from "@/lib/dataService";
 import { SimulatedNoticeBanner } from "@/components/ui/Alert";
+import { isLiveMode } from "@/lib/config";
 
 export function AppShell({ children, role = "official", title = "", breadcrumbs = [] }) {
   const pathname = usePathname();
@@ -92,8 +93,21 @@ export function AppShell({ children, role = "official", title = "", breadcrumbs 
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col antialiased">
-      {/* Top Demo Banner strictly clarifying mock sandbox */}
-      <SimulatedNoticeBanner className="rounded-none border-x-0 border-t-0 text-[11px] py-1.5 px-4 bg-blue-50/60 border-blue-200 text-blue-900" />
+      {/* Top Banner clarifying Live vs Demo mode */}
+      {isLiveMode() ? (
+        <div className="bg-emerald-50 border-b border-emerald-200 text-emerald-900 text-[11px] py-1.5 px-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-emerald-600 animate-pulse" />
+            <span className="font-semibold">Supabase Live Mode Active:</span>
+            <span>Querying PostgreSQL database and enforcing Server-Side RLS.</span>
+          </div>
+          <span className="text-[10px] font-bold uppercase tracking-wider bg-white border border-emerald-300 text-emerald-800 px-1.5 py-0.5 rounded">
+            LIVE DB
+          </span>
+        </div>
+      ) : (
+        <SimulatedNoticeBanner className="rounded-none border-x-0 border-t-0 text-[11px] py-1.5 px-4 bg-blue-50/60 border-blue-200 text-blue-900" />
+      )}
 
       <div className="flex flex-1">
         {/* DESKTOP SIDEBAR: 230px, fixed, subtle 1px border */}

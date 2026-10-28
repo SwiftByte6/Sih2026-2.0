@@ -21,7 +21,13 @@ import { StatusBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Input";
 import { Alert, SimulatedNoticeBanner } from "@/components/ui/Alert";
-import { getInstrumentById, formatINR, formatDate, formatDateTime } from "@/lib/dataService";
+import {
+  getInstrumentById,
+  sendClarification,
+  formatINR,
+  formatDate,
+  formatDateTime,
+} from "@/lib/dataService";
 
 export default function InstitutionInstrumentDetailPage() {
   return (
@@ -44,10 +50,6 @@ function InstitutionInstrumentDetailContent() {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      // BACKEND INTEGRATION:
-      // supabase.from('financial_instruments').select(`
-      //   *, institutions(*), documents(*), verification_checks(*), lifecycle_events(*)
-      // `).eq('id', id).single()
       const data = await getInstrumentById(id);
       setInstrument(data);
       setLoading(false);
@@ -55,24 +57,23 @@ function InstitutionInstrumentDetailContent() {
     load();
   }, [id]);
 
-  const handleSendClarification = (e) => {
+  const handleSendClarification = async (e) => {
     e.preventDefault();
     if (!clarificationText.trim()) return;
 
     setIsSending(true);
-    // BACKEND INTEGRATION:
-    // 1. Insert into public.workflow_tasks or public.notifications for official reviewer
-    // 2. Insert into public.lifecycle_events
-    // 3. Update public.financial_instruments notes
-
-    setTimeout(() => {
+    try {
+      await sendClarification({ instrumentId: id, text: clarificationText });
       setIsSending(false);
       setClarificationSent(true);
       setInstrument((prev) => ({
         ...prev,
         notes: `Clarification Submitted by Institution: ${clarificationText}`,
       }));
-    }, 500);
+    } catch (err) {
+      console.error("Failed to send clarification:", err);
+      setIsSending(false);
+    }
   };
 
   if (loading) {
