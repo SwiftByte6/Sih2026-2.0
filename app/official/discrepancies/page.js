@@ -11,6 +11,7 @@ import {
   Clock,
   ShieldAlert,
   Search,
+  Mail,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, SectionHeader } from "@/components/ui/Card";
@@ -26,6 +27,8 @@ export default function DiscrepanciesPage() {
   const [filterType, setFilterType] = useState("");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [sendingCheckId, setSendingCheckId] = useState(null);
+  const [emailNotice, setEmailNotice] = useState({ success: "", error: "" });
 
   useEffect(() => {
     async function load() {
@@ -40,6 +43,56 @@ export default function DiscrepanciesPage() {
     }
     load();
   }, []);
+
+  const handleSendNotificationEmail = async (check) => {
+    setSendingCheckId(check.id);
+    setEmailNotice({ success: "", error: "" });
+
+    const inst = check.instrument || {};
+    const collegeEmail =
+      inst.institution?.official_email ||
+      inst.institutions?.official_email ||
+      inst.official_email ||
+      "contact@diet-delhi.edu.in";
+
+    const payload = {
+      instrumentId: check.instrument_id,
+      institutionId: inst.institution_id || inst.institution?.id,
+      fdrReference: inst.instrument_reference || inst.fdr_number || "FDR",
+      fdrNumber: inst.fdr_number || "",
+      collegeEmail,
+      institutionName: inst.institution_name || "Technical Institution",
+      aicteInstitutionId: inst.aicte_institution_id || "—",
+      authorityDetails: "Dr. Rajesh Sharma, Senior Verification Officer, Bureau of Approval, AICTE Headquarters, New Delhi",
+      reason: `Rule: ${check.check_type} — ${check.message}`,
+      requiredAction: "Submit verified clarification letter from the issuing bank branch manager or rectified deposit receipt within 7 working days via Technical Institution Portal.",
+    };
+
+    try {
+      const res = await fetch("/api/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to dispatch email.");
+      }
+
+      setEmailNotice({
+        success: `Notification email successfully dispatched to ${data.recipient || "rohtisoneji6@gmail.com"} via Resend${data.id ? ` [Delivery ID: ${data.id}]` : ""}.`,
+        error: "",
+      });
+    } catch (err) {
+      setEmailNotice({
+        success: "",
+        error: err.message || "Failed to dispatch notification email.",
+      });
+    } finally {
+      setSendingCheckId(null);
+    }
+  };
 
   const filtered = discrepancies.filter((item) => {
     if (filterType && item.status !== filterType) return false;
@@ -79,6 +132,18 @@ export default function DiscrepanciesPage() {
             </Button>
           </Link>
         </div>
+
+        {/* Email Feedback Alerts */}
+        {emailNotice.success && (
+          <Alert variant="success" title="Notification Email Dispatched via Resend">
+            {emailNotice.success}
+          </Alert>
+        )}
+        {emailNotice.error && (
+          <Alert variant="error" title="Notification Email Dispatch Failed">
+            {emailNotice.error}
+          </Alert>
+        )}
 
         {/* Regulatory Guidance Banner */}
         <Alert
@@ -175,7 +240,16 @@ export default function DiscrepanciesPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={Mail}
+                      loading={sendingCheckId === check.id}
+                      onClick={() => handleSendNotificationEmail(check)}
+                    >
+                      Send Notification Email
+                    </Button>
                     <Link href={`/official/verification/${check.instrument_id}`}>
                       <Button variant="primary" size="sm" icon={ArrowRight} iconPosition="right">
                         Review in 3-Way Grid

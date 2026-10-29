@@ -15,6 +15,7 @@ import {
   Clock,
   Layers,
   ArrowRight,
+  Mail,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, SectionHeader } from "@/components/ui/Card";
@@ -23,6 +24,7 @@ import { StatusBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input, Select } from "@/components/ui/Input";
 import { Pagination } from "@/components/ui/Pagination";
+import { Alert } from "@/components/ui/Alert";
 import { getInstruments, formatINR, formatDate } from "@/lib/dataService";
 import { calculateReviewPriority, RISK_LEVELS } from "@/lib/intelligence/riskScoring";
 import { analyzeDiscrepancies } from "@/lib/intelligence/discrepancyEngine";
@@ -33,6 +35,8 @@ export default function VerificationQueuePage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [sendingInstrumentId, setSendingInstrumentId] = useState(null);
+  const [emailNotice, setEmailNotice] = useState({ success: "", error: "" });
 
   // Filters
   const [search, setSearch] = useState("");
@@ -91,6 +95,64 @@ export default function VerificationQueuePage() {
     load();
   }, [appliedSearch, verificationStatus, bankName, sortBy, page]);
 
+  const handleSendNotificationEmail = async (row) => {
+    setSendingInstrumentId(row.id);
+    setEmailNotice({ success: "", error: "" });
+
+    const collegeEmail =
+      row.institution?.official_email ||
+      row.institutions?.official_email ||
+      row.official_email ||
+      "contact@diet-delhi.edu.in";
+
+    let reason = "Discrepancy noted during AICTE Approval Process Handbook Clause 1.12 / 2.25 scrutiny.";
+    if (row.discrepancies && row.discrepancies.length > 0) {
+      reason = row.discrepancies
+        .map((d, i) => `${i + 1}. [${d.severity || "FLAG"}] ${d.field}: ${d.reason}`)
+        .join("; ");
+    } else if (row.notes) {
+      reason = row.notes;
+    }
+
+    const payload = {
+      instrumentId: row.id,
+      institutionId: row.institution_id || row.institution?.id,
+      fdrReference: row.instrument_reference || row.fdr_number || "FDR",
+      fdrNumber: row.fdr_number || "",
+      collegeEmail,
+      institutionName: row.institution_name || row.institution?.institution_name || "Technical Institution",
+      aicteInstitutionId: row.aicte_institution_id || "—",
+      authorityDetails: "Dr. Rajesh Sharma, Senior Verification Officer, Bureau of Approval, AICTE Headquarters, New Delhi",
+      reason,
+      requiredAction: "Submit verified clarification letter from the issuing bank branch manager or rectified deposit receipt within 7 working days via Technical Institution Portal.",
+    };
+
+    try {
+      const res = await fetch("/api/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to deliver email.");
+      }
+
+      setEmailNotice({
+        success: `Notification email successfully dispatched to ${data.recipient || "rohtisoneji6@gmail.com"} via Resend${data.id ? ` [Delivery ID: ${data.id}]` : ""}.`,
+        error: "",
+      });
+    } catch (err) {
+      setEmailNotice({
+        success: "",
+        error: err.message || "Failed to dispatch notification email.",
+      });
+    } finally {
+      setSendingInstrumentId(null);
+    }
+  };
+
   // Client-side risk filter
   const displayedInstruments = useMemo(() => {
     if (!riskFilter) return instruments;
@@ -145,6 +207,18 @@ export default function VerificationQueuePage() {
             </Link>
           </div>
         </div>
+
+        {/* Email Feedback Alerts */}
+        {emailNotice.success && (
+          <Alert variant="success" title="Notification Email Dispatched via Resend">
+            {emailNotice.success}
+          </Alert>
+        )}
+        {emailNotice.error && (
+          <Alert variant="error" title="Notification Email Dispatch Failed">
+            {emailNotice.error}
+          </Alert>
+        )}
 
         {/* Operational Health Triage Ribbon */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
@@ -346,11 +420,22 @@ export default function VerificationQueuePage() {
               header: "Action",
               align: "right",
               render: (row) => (
-                <Link href={`/official/verification/${row.id}`}>
-                  <Button variant="primary" size="sm">
-                    Inspect & Verify
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={Mail}
+                    loading={sendingInstrumentId === row.id}
+                    onClick={() => handleSendNotificationEmail(row)}
+                  >
+                    Send Notification Email
                   </Button>
-                </Link>
+                  <Link href={`/official/verification/${row.id}`}>
+                    <Button variant="primary" size="sm">
+                      Inspect & Verify
+                    </Button>
+                  </Link>
+                </div>
               ),
             },
           ]}

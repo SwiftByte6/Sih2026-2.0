@@ -53,7 +53,7 @@ During the recent preparation for the official workflow audit and demo video rec
 ### F. Multi-Modal AI Document OCR Model Fallback Update
 - **File:** `lib/intelligence/fdrOcrService.js`
 - **Change:** The primary live extraction model `gemini-2.5-flash` was verified operational (tested against demo fixture with 98.8% confidence). However, the secondary fallback model `gemini-2.0-flash` was discontinued by the Google Gemini API (returning HTTP 404).
-- **Implementation:** Updated the fallback model to `gemini-1.5-flash` with graceful fallback handling to ensure live PDF uploads never fail due to API model deprecations.
+- **Implementation:** Standardized on `gemini-2.5-flash` with robust retry handling to ensure live PDF uploads and AI document scrutiny operate on Google's latest multimodal vision model.
 
 ### G. Supabase Storage URL Sanitization
 - **File:** `lib/config.js`

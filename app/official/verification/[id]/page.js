@@ -26,6 +26,7 @@ import {
   Clock,
   ShieldCheck,
   BookOpen,
+  Mail,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, SectionHeader } from "@/components/ui/Card";
@@ -72,6 +73,11 @@ function VerificationDetailContent() {
   const [actionModalOpen, setActionModalOpen] = useState(false);
   const [modalActionType, setModalActionType] = useState("REQUEST_CLARIFICATION");
   const [actionSuccessMessage, setActionSuccessMessage] = useState("");
+
+  // Email Notification State
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [emailSuccessMessage, setEmailSuccessMessage] = useState("");
+  const [emailErrorMessage, setEmailErrorMessage] = useState("");
 
   // Officer field overrides / corrections map
   const [corrections, setCorrections] = useState({});
@@ -227,6 +233,72 @@ function VerificationDetailContent() {
     setActionSuccessMessage(`Field ${fieldId} updated to "${value}". Logged to audit trail.`);
   };
 
+  const handleSendNotificationEmail = async (customReason = null) => {
+    if (!instrument) return;
+    setIsSendingEmail(true);
+    setEmailErrorMessage("");
+    setEmailSuccessMessage("");
+
+    // Determine registered college email
+    const collegeEmail =
+      instrument.institution?.official_email ||
+      instrument.institutions?.official_email ||
+      instrument.official_email ||
+      "contact@diet-delhi.edu.in";
+
+    // Format discrepancy or missing document reason
+    let formattedReason = customReason;
+    if (!formattedReason) {
+      if (discrepancies && discrepancies.length > 0) {
+        formattedReason = discrepancies
+          .map(
+            (d, idx) =>
+              `${idx + 1}. [${d.severity || "FLAG"}] ${d.field}: ${d.reason} (Submitted: ${d.submitted_value || "N/A"}, Extracted: ${d.extracted_value || "N/A"}${d.cbs_value && d.cbs_value !== "N/A" ? `, CBS Ledger: ${d.cbs_value}` : ""})`
+          )
+          .join("\n");
+      } else if (instrument.verification_status === "ACTION_REQUIRED" && instrument.notes) {
+        formattedReason = instrument.notes;
+      } else {
+        formattedReason = "Discrepancy noted during AICTE Approval Process Handbook Clause 1.12 / 2.25 scrutiny.";
+      }
+    }
+
+    const payload = {
+      instrumentId: instrument.id,
+      institutionId: instrument.institution_id || instrument.institution?.id,
+      fdrReference: instrument.instrument_reference || instrument.fdr_number || "FDR",
+      fdrNumber: instrument.fdr_number || "",
+      collegeEmail,
+      institutionName: instrument.institution_name || instrument.institution?.institution_name || "Technical Institution",
+      aicteInstitutionId: instrument.aicte_institution_id || instrument.institution?.aicte_institution_id || "—",
+      authorityDetails: "Dr. Rajesh Sharma, Senior Verification Officer, Bureau of Approval, AICTE Headquarters, New Delhi",
+      reason: formattedReason,
+      requiredAction: "Submit verified clarification letter from the issuing bank branch manager or rectified deposit receipt within 7 working days via Technical Institution Portal.",
+    };
+
+    try {
+      const res = await fetch("/api/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to deliver email.");
+      }
+
+      setEmailSuccessMessage(
+        `Notification email successfully dispatched to ${data.recipient || "rohtisoneji6@gmail.com"} via Resend${data.id ? ` [Delivery ID: ${data.id}]` : ""}.`
+      );
+    } catch (err) {
+      setEmailErrorMessage(err.message || "Failed to dispatch notification email.");
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
   if (loading) {
     return (
       <AppShell role="official">
@@ -280,6 +352,15 @@ function VerificationDetailContent() {
           {/* Quick Officer Actions */}
           <div className="flex flex-wrap items-center gap-2">
             <Button
+              variant="primary"
+              size="sm"
+              icon={Mail}
+              loading={isSendingEmail}
+              onClick={() => handleSendNotificationEmail()}
+            >
+              Send Notification Email
+            </Button>
+            <Button
               variant="secondary"
               size="sm"
               icon={Send}
@@ -313,6 +394,18 @@ function VerificationDetailContent() {
             </Button>
           </div>
         </div>
+
+        {/* EMAIL FEEDBACK ALERTS */}
+        {emailSuccessMessage && (
+          <Alert variant="success" title="Notification Email Dispatched via Resend">
+            {emailSuccessMessage}
+          </Alert>
+        )}
+        {emailErrorMessage && (
+          <Alert variant="error" title="Notification Email Dispatch Failed">
+            {emailErrorMessage}
+          </Alert>
+        )}
 
         {/* FEEDBACK SUCCESS ALERT */}
         {actionSuccessMessage && (
@@ -409,16 +502,27 @@ function VerificationDetailContent() {
             ========================================================================= */}
         {discrepancies.length > 0 && (
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-amber-600" />
                 <h3 className="text-sm font-bold text-slate-900">
                   Detected Discrepancies & Variances ({discrepancies.length})
                 </h3>
               </div>
-              <span className="text-[11px] text-slate-500">
-                Rule: High OCR confidence does not override detected discrepancies.
-              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={Mail}
+                  loading={isSendingEmail}
+                  onClick={() => handleSendNotificationEmail()}
+                >
+                  Send Notification Email
+                </Button>
+                <span className="text-[11px] text-slate-500 hidden md:inline">
+                  Rule: High OCR confidence does not override detected discrepancies.
+                </span>
+              </div>
             </div>
 
             <div className="space-y-2.5">
