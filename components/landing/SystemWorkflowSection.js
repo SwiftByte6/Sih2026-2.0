@@ -1,20 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import {
-  Building2,
-  UploadCloud,
-  Cpu,
-  GitCompare,
-  ShieldCheck,
-  UserCheck,
-  BellRing,
-  FileCheck2,
-  Sparkles,
-  ArrowRight,
-  Database,
-  CheckCircle2,
-} from "lucide-react";
 
 export function SystemWorkflowSection() {
   const [activeStage, setActiveStage] = useState(null);
@@ -72,7 +58,7 @@ export function SystemWorkflowSection() {
   return (
     <section
       id="system-workflow"
-      className="relative overflow-hidden bg-[#070c1e] text-white py-16 sm:py-20 select-none"
+      className="workflow-diagram relative overflow-hidden bg-white py-16 text-[#17172B] select-none sm:py-20"
     >
       {/* Animation Styles */}
       <style>{`
@@ -94,39 +80,105 @@ export function SystemWorkflowSection() {
             transform: scale(1.04);
           }
         }
+
+        .workflow-diagram [class*="bg-[#0b1436]"],
+        .workflow-diagram [class*="bg-[#09112e]"],
+        .workflow-diagram [class*="bg-[#060d24]"] {
+          background: #ffffff;
+          border-color: #e8e3ff;
+          box-shadow: 0 8px 24px rgba(96, 72, 232, 0.08);
+        }
+        .workflow-diagram [class*="bg-gradient-to-b"] {
+          background: linear-gradient(180deg, #f7f4ff 0%, #ffffff 100%);
+          border-color: #6048e8;
+          box-shadow: 0 0 28px rgba(96, 72, 232, 0.18);
+        }
+        .workflow-diagram .workflow-center-node {
+          border-color: rgba(96, 72, 232, 0.3);
+          box-shadow: none;
+        }
+        .workflow-diagram [class*="text-white"] {
+          color: #17172b;
+        }
+        .workflow-diagram [class*="text-slate-400"],
+        .workflow-diagram [class*="text-slate-200"] {
+          color: #66677a;
+        }
+        .workflow-diagram [class*="text-blue-400"],
+        .workflow-diagram [class*="text-blue-300"],
+        .workflow-diagram [class*="text-blue-200"],
+        .workflow-diagram [class*="text-cyan-400"] {
+          color: #6048e8;
+        }
+        .workflow-diagram [class*="border-[#1b2b63]"],
+        .workflow-diagram [class*="border-[#1e3573]"] {
+          border-color: #e8e3ff;
+        }
+        .workflow-diagram [class*="bg-blue-600"],
+        .workflow-diagram [class*="bg-cyan-500"] {
+          background: #f0ecff;
+        }
+        .workflow-diagram [class*="bg-blue-500"],
+        .workflow-diagram [class*="bg-cyan-400"] {
+          background: #6048e8;
+        }
+        .workflow-diagram [class*="shadow-[0_0_20px_rgba(59,130,246"],
+        .workflow-diagram [class*="shadow-[0_0_20px_rgba(56,189,248"] {
+          box-shadow: 0 8px 24px rgba(96, 72, 232, 0.14);
+        }
+        .workflow-diagram .workflow-svg path[stroke="#38bdf8"],
+        .workflow-diagram .workflow-svg path[stroke="#3b82f6"] {
+          stroke: #6048e8;
+        }
+        .workflow-diagram .workflow-svg path[stroke="#223d7a"] {
+          stroke: #d8cfff;
+        }
+        .workflow-diagram .workflow-svg path[fill="#38bdf8"] {
+          fill: #6048e8;
+        }
+        .workflow-diagram .workflow-svg stop[stop-color="#38bdf8"],
+        .workflow-diagram .workflow-svg stop[stop-color="#2563eb"] {
+          stop-color: #6048e8;
+        }
+        .workflow-diagram .workflow-svg {
+          opacity: 0.9;
+        }
+        .workflow-diagram [class*="bg-[#09112e]"],
+        .workflow-diagram [class*="bg-[#060d24]"] {
+          background: #ffffff;
+        }
       `}</style>
 
       {/* Subtle Dotted Matrix Grid Background */}
       <div
-        className="absolute inset-0 pointer-events-none opacity-20"
+        className="absolute inset-0 pointer-events-none opacity-30"
         style={{
           backgroundImage:
-            "radial-gradient(circle, #5b78b8 1.1px, transparent 1.1px)",
-          backgroundSize: "26px 26px",
+            "radial-gradient(circle, #D8CFFF 1px, transparent 1px)",
+          backgroundSize: "28px 28px",
         }}
       />
 
-      {/* Soft Ambient Royal Blue Center Glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[440px] bg-[#0052ff]/12 rounded-full blur-[140px] pointer-events-none" />
+      {/* Soft ambient purple glow */}
+      <div className="absolute top-1/2 left-1/2 h-[440px] w-[760px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#6048E8]/10 blur-[140px] pointer-events-none" />
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* ===================================================================
             HEADER: Connected Systems. Unified FDR Governance.
             =================================================================== */}
         <div className="max-w-3xl mb-10 sm:mb-14">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-950/80 border border-blue-500/30 text-blue-400 text-xs font-semibold mb-4 backdrop-blur-xs">
-            <Sparkles className="h-3.5 w-3.5 text-blue-400 animate-pulse" />
+          <div className="inline-flex items-center rounded-full border border-[#DDD5FF] bg-[#F7F4FF] px-3 py-1 text-xs font-semibold text-[#6048E8] mb-4">
             <span>End-to-End Governance Architecture</span>
           </div>
 
-          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-white leading-tight">
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-[#17172B] leading-tight">
             Connected Systems.{" "}
-            <span className="bg-gradient-to-r from-blue-400 via-sky-300 to-blue-200 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-[#17172B] via-[#6048E8] to-[#A99BEA] bg-clip-text text-transparent">
               Unified FDR Governance.
             </span>
           </h2>
 
-          <p className="mt-3 text-sm sm:text-base text-slate-400 leading-relaxed max-w-2xl">
+          <p className="mt-3 text-sm sm:text-base text-[#66677A] leading-relaxed max-w-2xl">
             From institutional submissions to document verification, official
             decisions, and actionable notifications — manage the complete security
             deposit lifecycle through one integrated platform.
@@ -136,32 +188,15 @@ export function SystemWorkflowSection() {
         {/* ===================================================================
             DESKTOP & TABLET INTEGRATION DIAGRAM (Scalable Vector Canvas)
             =================================================================== */}
-        <div className="hidden md:block relative w-full max-w-5xl mx-auto bg-[#09112e]/60 border border-[#1b2b63]/70 rounded-2xl p-4 sm:p-6 shadow-2xl backdrop-blur-md">
+        <div className="hidden md:block relative w-full max-w-5xl mx-auto rounded-2xl border border-[#E8E3FF] bg-white/80 p-4 shadow-[0_18px_50px_rgba(96,72,232,0.1)] backdrop-blur-md sm:p-6">
           
           {/* Top Status Header */}
-          <div className="flex items-center justify-between pb-4 mb-2 border-b border-[#1b2b63]/60 text-xs text-slate-400">
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-cyan-400 animate-ping" />
-              <span className="font-semibold text-slate-200 uppercase tracking-wider text-[11px]">
-                Application Workflow Mesh
-              </span>
-            </div>
-            <div className="flex items-center gap-4 text-[11px]">
-              <span className="flex items-center gap-1.5">
-                <span className="h-1.5 w-3 rounded-full bg-cyan-400" />
-                Active Analysis Flow
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="h-1.5 w-3 rounded-full bg-blue-500" />
-                Verification & Audit
-              </span>
-            </div>
-          </div>
+         
 
           {/* SVG Diagram Canvas */}
           <div className="relative w-full aspect-[1000/520]">
             <svg
-              className="absolute inset-0 w-full h-full overflow-visible"
+              className="workflow-svg absolute inset-0 w-full h-full overflow-visible"
               viewBox="0 0 1000 520"
               preserveAspectRatio="xMidYMid meet"
             >
@@ -404,9 +439,6 @@ export function SystemWorkflowSection() {
             >
               <div className="bg-[#0b1436] hover:bg-[#101c4a] border border-[#1e3573] hover:border-blue-400 rounded-xl p-3 shadow-lg transition-all duration-200 group-hover:scale-105 group-hover:shadow-[0_0_20px_rgba(59,130,246,0.35)]">
                 <div className="flex items-center gap-2 mb-1.5">
-                  <div className="p-1.5 rounded-lg bg-blue-600/30 text-blue-400">
-                    <Building2 className="h-4 w-4" />
-                  </div>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400">
                     Step 01
                   </span>
@@ -428,9 +460,6 @@ export function SystemWorkflowSection() {
             >
               <div className="bg-[#0b1436] hover:bg-[#101c4a] border border-[#1e3573] hover:border-blue-400 rounded-xl p-3 shadow-lg transition-all duration-200 group-hover:scale-105 group-hover:shadow-[0_0_20px_rgba(59,130,246,0.35)]">
                 <div className="flex items-center gap-2 mb-1.5">
-                  <div className="p-1.5 rounded-lg bg-blue-600/30 text-blue-400">
-                    <UploadCloud className="h-4 w-4" />
-                  </div>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400">
                     Step 02
                   </span>
@@ -452,9 +481,6 @@ export function SystemWorkflowSection() {
             >
               <div className="bg-[#0b1436] hover:bg-[#101c4a] border border-[#1e3573] hover:border-cyan-400 rounded-xl p-3 shadow-lg transition-all duration-200 group-hover:scale-105 group-hover:shadow-[0_0_20px_rgba(56,189,248,0.35)]">
                 <div className="flex items-center gap-2 mb-1.5">
-                  <div className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-400">
-                    <Cpu className="h-4 w-4" />
-                  </div>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-400">
                     AI Pipeline
                   </span>
@@ -463,7 +489,7 @@ export function SystemWorkflowSection() {
                   AI Document Analysis
                 </div>
                 <div className="text-[10px] text-slate-400 mt-0.5">
-                  Gemini 2.5 Flash OCR
+                   Flash OCR
                 </div>
               </div>
             </div>
@@ -476,9 +502,6 @@ export function SystemWorkflowSection() {
             >
               <div className="bg-[#0b1436] hover:bg-[#101c4a] border border-[#1e3573] hover:border-cyan-400 rounded-xl p-3 shadow-lg transition-all duration-200 group-hover:scale-105 group-hover:shadow-[0_0_20px_rgba(56,189,248,0.35)]">
                 <div className="flex items-center gap-2 mb-1.5">
-                  <div className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-400">
-                    <GitCompare className="h-4 w-4" />
-                  </div>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-400">
                     Verification
                   </span>
@@ -498,13 +521,8 @@ export function SystemWorkflowSection() {
               onMouseEnter={() => setActiveStage("platform")}
               onMouseLeave={() => setActiveStage(null)}
             >
-              {/* Pulsing Blue Glow Aura */}
-              <div className="absolute -inset-2 bg-blue-500/25 rounded-2xl blur-md group-hover:bg-blue-500/40 transition-all duration-300" />
-
-              <div className="relative bg-gradient-to-b from-[#162a69] via-[#0f1d4a] to-[#08102d] border-2 border-blue-400 rounded-2xl p-3.5 text-center shadow-[0_0_35px_rgba(37,99,235,0.45)] transition-all duration-200 group-hover:scale-105">
-                <span className="inline-block text-[9px] font-extrabold uppercase tracking-widest text-blue-300 bg-blue-950/80 px-2 py-0.5 rounded-full border border-blue-400/40 mb-1">
-                  Core Engine
-                </span>
+              <div className="workflow-center-node relative bg-gradient-to-b from-[#162a69]/50 via-[#0f1d4a]/50 to-[#08102d]/30 border-2 border-[#6048E8]/30 rounded-2xl p-3.5 text-center shadow-none transition-all duration-200 group-hover:scale-105">
+                
                 <div className="text-xl font-extrabold lowercase tracking-tight text-white">
                   aicte
                 </div>
@@ -522,9 +540,6 @@ export function SystemWorkflowSection() {
             >
               <div className="bg-[#0b1436] hover:bg-[#101c4a] border border-[#1e3573] hover:border-blue-400 rounded-xl p-3 shadow-lg transition-all duration-200 group-hover:scale-105 group-hover:shadow-[0_0_20px_rgba(59,130,246,0.35)]">
                 <div className="flex items-center gap-2 mb-1.5">
-                  <div className="p-1.5 rounded-lg bg-blue-600/30 text-blue-400">
-                    <ShieldCheck className="h-4 w-4" />
-                  </div>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400">
                     Step 03
                   </span>
@@ -546,9 +561,6 @@ export function SystemWorkflowSection() {
             >
               <div className="bg-[#0b1436] hover:bg-[#101c4a] border border-[#1e3573] hover:border-blue-400 rounded-xl p-3 shadow-lg transition-all duration-200 group-hover:scale-105 group-hover:shadow-[0_0_20px_rgba(59,130,246,0.35)]">
                 <div className="flex items-center gap-2 mb-1.5">
-                  <div className="p-1.5 rounded-lg bg-blue-600/30 text-blue-400">
-                    <UserCheck className="h-4 w-4" />
-                  </div>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400">
                     Step 04
                   </span>
@@ -570,9 +582,6 @@ export function SystemWorkflowSection() {
             >
               <div className="bg-[#0b1436] hover:bg-[#101c4a] border border-[#1e3573] hover:border-blue-400 rounded-xl p-3 shadow-lg transition-all duration-200 group-hover:scale-105 group-hover:shadow-[0_0_20px_rgba(59,130,246,0.35)]">
                 <div className="flex items-center gap-2 mb-1.5">
-                  <div className="p-1.5 rounded-lg bg-blue-600/30 text-blue-400">
-                    <FileCheck2 className="h-4 w-4" />
-                  </div>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400">
                     Audit Log
                   </span>
@@ -594,9 +603,6 @@ export function SystemWorkflowSection() {
             >
               <div className="bg-[#0b1436] hover:bg-[#101c4a] border border-[#1e3573] hover:border-cyan-400 rounded-xl p-3 shadow-lg transition-all duration-200 group-hover:scale-105 group-hover:shadow-[0_0_20px_rgba(56,189,248,0.35)]">
                 <div className="flex items-center gap-2 mb-1.5">
-                  <div className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-400">
-                    <BellRing className="h-4 w-4" />
-                  </div>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-400">
                     Alert Dispatch
                   </span>
@@ -651,7 +657,6 @@ export function SystemWorkflowSection() {
                   <span className="text-[10px] font-bold uppercase text-blue-400">
                     Step 01
                   </span>
-                  <Building2 className="h-4 w-4 text-blue-400" />
                 </div>
                 <div className="font-semibold text-white text-xs">
                   College Portal
@@ -667,7 +672,6 @@ export function SystemWorkflowSection() {
                   <span className="text-[10px] font-bold uppercase text-blue-400">
                     Step 02
                   </span>
-                  <UploadCloud className="h-4 w-4 text-blue-400" />
                 </div>
                 <div className="font-semibold text-white text-xs">
                   Document Upload
@@ -683,14 +687,11 @@ export function SystemWorkflowSection() {
                   <span className="text-[10px] font-bold uppercase text-cyan-400">
                     AI Pipeline
                   </span>
-                  <Cpu className="h-4 w-4 text-cyan-400" />
                 </div>
                 <div className="font-semibold text-white text-xs">
                   AI Document Analysis
                 </div>
-                <p className="text-slate-400 text-[11px] mt-0.5">
-                  Gemini 2.5 Flash OCR parsing FDR fields & bank stamps.
-                </p>
+                <p className="text-slate-400 text-[11px] mt-0.5">                </p>
               </div>
 
               {/* Step 4: 3-Way Data Matching */}
@@ -699,7 +700,6 @@ export function SystemWorkflowSection() {
                   <span className="text-[10px] font-bold uppercase text-cyan-400">
                     Verification
                   </span>
-                  <GitCompare className="h-4 w-4 text-cyan-400" />
                 </div>
                 <div className="font-semibold text-white text-xs">
                   3-Way Data Matching
@@ -715,7 +715,6 @@ export function SystemWorkflowSection() {
                   <span className="text-[10px] font-bold uppercase text-blue-400">
                     Step 03
                   </span>
-                  <ShieldCheck className="h-4 w-4 text-blue-400" />
                 </div>
                 <div className="font-semibold text-white text-xs">
                   Compliance Validation
@@ -731,7 +730,6 @@ export function SystemWorkflowSection() {
                   <span className="text-[10px] font-bold uppercase text-blue-400">
                     Step 04
                   </span>
-                  <UserCheck className="h-4 w-4 text-blue-400" />
                 </div>
                 <div className="font-semibold text-white text-xs">
                   Official Review
@@ -745,7 +743,6 @@ export function SystemWorkflowSection() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div className="p-3 rounded-xl bg-[#0b1436] border border-cyan-500/40">
                   <div className="flex items-center gap-1.5 mb-1 text-cyan-400">
-                    <BellRing className="h-3.5 w-3.5" />
                     <span className="text-[10px] font-bold uppercase">
                       In-App & Email Preview
                     </span>
@@ -757,7 +754,6 @@ export function SystemWorkflowSection() {
 
                 <div className="p-3 rounded-xl bg-[#0b1436] border border-[#1e3573]">
                   <div className="flex items-center gap-1.5 mb-1 text-blue-400">
-                    <FileCheck2 className="h-3.5 w-3.5" />
                     <span className="text-[10px] font-bold uppercase">
                       Audit Trail
                     </span>
