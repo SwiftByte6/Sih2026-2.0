@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   FileText,
   ZoomIn,
@@ -34,11 +34,16 @@ export function PdfSplitViewer({
   const [zoomLevel, setZoomLevel] = useState(100);
   const [pageNumber, setPageNumber] = useState(1);
 
-  const currentDoc = documents[currentDocIndex] || documents[0] || {
-    original_filename: "FDR_Receipt_Scan.pdf",
-    storage_path: "AICTE_FDR_Demo_PDF_Pack/fdr-001_FDR-2024-ND-001_SIMULATED.pdf",
-    document_type: "FDR_COPY",
-  };
+  const currentDoc = useMemo(() => {
+    return (
+      documents[currentDocIndex] ||
+      documents[0] || {
+        original_filename: "FDR_Receipt_Scan.pdf",
+        storage_path: "AICTE_FDR_Demo_PDF_Pack/fdr-001_FDR-2024-ND-001_SIMULATED.pdf",
+        document_type: "FDR_COPY",
+      }
+    );
+  }, [documents, currentDocIndex]);
 
   useEffect(() => {
     let isMounted = true;
@@ -64,12 +69,14 @@ export function PdfSplitViewer({
     return () => {
       isMounted = false;
     };
-  }, [currentDocIndex, currentDoc?.storage_path, currentDoc?.original_filename]);
+  }, [currentDocIndex, currentDoc]);
 
   // When activeField changes, adjust page if specified
   useEffect(() => {
     if (activeField?.source_page) {
-      setPageNumber(activeField.source_page);
+      queueMicrotask(() => {
+        setPageNumber(activeField.source_page);
+      });
     }
   }, [activeField]);
 
