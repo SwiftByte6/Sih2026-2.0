@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/Badge";
 import { formatINR, formatDate, getInstruments } from "@/lib/dataService";
 import { SimulatedNoticeBanner } from "@/components/ui/Alert";
+import { SystemWorkflowSection } from "@/components/landing/SystemWorkflowSection";
 
 export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -73,6 +74,11 @@ export default function HomePage() {
                   Access Portal Login
                 </Button>
               </Link>
+              <a href="#system-workflow">
+                <Button variant="secondary" size="lg">
+                  System Architecture
+                </Button>
+              </a>
               <a href="#public-tracker">
                 <Button variant="secondary" size="lg" icon={Search}>
                   Verify Instrument Status
@@ -87,6 +93,9 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* System Integration & Workflow Architecture Section */}
+      <SystemWorkflowSection />
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-16">
