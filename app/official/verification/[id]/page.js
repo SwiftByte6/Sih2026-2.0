@@ -198,10 +198,18 @@ function VerificationDetailContent() {
         lifecycle_status: decisionType === "VERIFY" ? "ACTIVE" : prev.lifecycle_status,
       }));
     } else if (actionType === "REQUEST_CLARIFICATION") {
+      res = await recordVerificationDecision({
+        instrumentId: id,
+        decisionType: "FLAG_DISCREPANCY",
+        reason: `${subject}: ${content}`,
+        actorId: "user-official-1",
+        actorName: "Dr. Rajesh Sharma",
+      });
       setActionSuccessMessage(`Official Clarification Dispatched: "${subject}" sent to institution registrar.`);
       setInstrument((prev) => ({
         ...prev,
         verification_status: "ACTION_REQUIRED",
+        notes: `Official Discrepancy Notice: ${subject} - ${content}`,
       }));
     } else if (actionType === "RESOLVE_DISCREPANCY") {
       setActionSuccessMessage(`Discrepancy Marked Resolved: ${reason}`);

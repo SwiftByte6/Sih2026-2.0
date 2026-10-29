@@ -17,7 +17,7 @@ import { StatusBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input, Select } from "@/components/ui/Input";
 import { Pagination } from "@/components/ui/Pagination";
-import { getInstruments, formatINR, formatDate } from "@/lib/dataService";
+import { getInstruments, formatINR, formatDate, getCurrentUser } from "@/lib/dataService";
 
 export default function InstitutionInstrumentsPage() {
   const [instruments, setInstruments] = useState([]);
@@ -29,7 +29,8 @@ export default function InstitutionInstrumentsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
 
-  const institutionId = "inst-001";
+  const currentUser = getCurrentUser();
+  const institutionId = currentUser?.institution_id || "inst-001";
 
   useEffect(() => {
     async function load() {

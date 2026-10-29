@@ -160,7 +160,7 @@ export function AppShell({ children, role = "official", title = "", breadcrumbs 
             })}
           </nav>
 
-          {/* Role Switcher Sandbox Helper
+          {/* Role Switcher Sandbox Helper */}
           <div className="p-3 border-t border-slate-100 bg-slate-50/50">
             <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 px-1">
               Switch Sandbox Role
@@ -200,7 +200,7 @@ export function AppShell({ children, role = "official", title = "", breadcrumbs 
                 3. Admin Role
               </button>
             </div>
-          </div> */}
+          </div>
 
           {/* Footer User Info */}
           <div className="p-3 border-t border-slate-200 flex items-center justify-between">

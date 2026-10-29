@@ -25,7 +25,7 @@ import { Card, SectionHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input, Select, Textarea } from "@/components/ui/Input";
 import { Alert, SimulatedNoticeBanner } from "@/components/ui/Alert";
-import { formatINR, createInstrument } from "@/lib/dataService";
+import { formatINR, createInstrument, getCurrentUser } from "@/lib/dataService";
 
 export default function NewInstrumentPage() {
   const router = useRouter();
@@ -171,7 +171,9 @@ export default function NewInstrumentPage() {
     setSubmitError("");
 
     try {
-      await createInstrument(formData, uploadedFile, "11111111-1111-1111-1111-111111111101");
+      const currentUser = getCurrentUser();
+      const instId = currentUser?.institution_id || "inst-001";
+      await createInstrument(formData, uploadedFile, instId);
       setIsSubmitting(false);
       setSubmissionSuccess(true);
       setTimeout(() => {
