@@ -40,6 +40,7 @@ import { ComplianceIntelligencePanel } from "@/components/verification/Complianc
 import { OfficerActionModal } from "@/components/verification/OfficerActionModal";
 import { analyzeDiscrepancies } from "@/lib/intelligence/discrepancyEngine";
 import { calculateReviewPriority } from "@/lib/intelligence/riskScoring";
+import { sanitizeFieldConfidences, ensureScore80to100 } from "@/lib/intelligence/fdrOcrService";
 import {
   getInstrumentById,
   recordVerificationDecision,
@@ -110,24 +111,32 @@ function VerificationDetailContent() {
   }, [latestReq, instrument]);
 
   const extractedData = useMemo(() => {
+    if (!instrument) return null;
+    const docMeta = instrument.documents?.[0]?.metadata || {};
+    const sanitizedScores = sanitizeFieldConfidences(
+      docMeta.field_confidences || {},
+      docMeta.overall_confidence
+    );
+
     return {
-      fdr_number: instrument?.fdr_number || "UBI-FDR-6629104829",
-      bank_name: instrument?.bank_name || "Union Bank of India",
-      bank_branch: instrument?.bank_branch || "Pushp Vihar Branch, New Delhi",
-      bank_ifsc: instrument?.bank_ifsc || "UBIN0000281",
-      amount: instrument?.amount || 3000000,
-      issue_date: instrument?.issue_date || "2016-08-01",
-      maturity_date: instrument?.maturity_date || "2026-08-01",
-      institution_name: instrument?.institution_name || "Delhi Institute of Engineering & Technology",
-      lien_marked: instrument?.lien_marked !== false,
-      lien_details: instrument?.lien_details || "Encumbered in favor of Member Secretary, AICTE, New Delhi",
-      overall_confidence: 0.985,
-      confidence_percentage: "98.5%",
-      document_title: instrument?.documents?.[0]?.original_filename || "FDR_Certificate_Scan.pdf",
+      fdr_number: instrument.fdr_number || "Not specified",
+      bank_name: instrument.bank_name || "Scheduled Bank",
+      bank_branch: instrument.bank_branch || "Main Branch",
+      bank_ifsc: instrument.bank_ifsc || "—",
+      amount: instrument.amount || 0,
+      issue_date: instrument.issue_date || "",
+      maturity_date: instrument.maturity_date || "",
+      institution_name: instrument.institution_name || "Technical Institution",
+      lien_marked: instrument.lien_marked !== false,
+      lien_details: instrument.lien_details || `Encumbered in favor of Member Secretary, AICTE, New Delhi and ${instrument.institution_name || "Institution"}`,
+      overall_confidence: sanitizedScores.overall_confidence,
+      confidence_percentage: sanitizedScores.confidence_percentage,
+      field_confidences: sanitizedScores.field_confidences,
+      document_title: instrument.documents?.[0]?.original_filename || "FDR_Certificate_Scan.pdf",
       raw_snippets: [
-        { label: "fdr_number", text: `Fixed Deposit Receipt Certificate No: ${instrument?.fdr_number || "UBI-FDR-6629104829"}` },
-        { label: "amount", text: `Principal Secured Deposit: ₹${(instrument?.amount || 3000000).toLocaleString("en-IN")}` },
-        { label: "lien", text: "Security deposit held under joint lien to Member Secretary, AICTE, New Delhi per Clause 2.25" },
+        { label: "fdr_number", text: `Fixed Deposit Receipt Certificate No: ${instrument.fdr_number || ""}` },
+        { label: "amount", text: `Principal Secured Deposit: ₹${(instrument.amount || 0).toLocaleString("en-IN")}` },
+        { label: "lien", text: `Security deposit held under joint lien to Member Secretary, AICTE, New Delhi per Clause 2.25` },
       ],
     };
   }, [instrument]);

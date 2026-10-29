@@ -250,7 +250,7 @@ export default function OfficialDashboardPage() {
                     render: (row) => (
                       <Link href={`/official/verification/${row.id}`}>
                         <Button variant="primary" size="sm">
-                          Inspect & Verify
+                          Inspect 
                         </Button>
                       </Link>
                     ),

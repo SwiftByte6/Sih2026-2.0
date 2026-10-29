@@ -79,23 +79,93 @@ const SCENARIO_PRESETS = [
       { name: "13_Latest_LoA_EoA_Illustrative_SIMULATED.pdf", type: "LOA_EOA", label: "Council EoA Letter" },
     ],
   },
+  {
+    id: "scenario_4",
+    label: "Scenario 4: Bangalore Inst. High-Value PG Deposit",
+    tag: "Clean Verification (₹75L)",
+    description: "Bangalore Inst. of Advanced Tech • SBI ₹75L • PG Technical Programs • Joint lien verified",
+    badgeVariant: "success",
+    caseId: "fdr-010",
+    files: [
+      { name: "fdr-010_FDR-2023-KA-010_SIMULATED.pdf", type: "FDR_COPY", label: "SBI FDR Certificate (₹75 Lakh)" },
+      { name: "10_Affidavit_6_Release_Security_Deposit_SIMULATED.pdf", type: "AFFIDAVIT_6", label: "Statutory Affidavit-6" },
+      { name: "11_Request_Letter_Release_REL-2026-0012_SIMULATED.pdf", type: "INSTITUTION_REQUEST_LETTER", label: "Institutional Submission Letter" },
+      { name: "13_Latest_LoA_EoA_Illustrative_SIMULATED.pdf", type: "LOA_EOA", label: "AICTE EoA 2025-26" },
+    ],
+  },
+  {
+    id: "scenario_5",
+    label: "Scenario 5: Gujarat Tech Academy Multi-Disciplinary",
+    tag: "Compliant & Verified",
+    description: "Gujarat Tech & Research Academy • HDFC Bank ₹40L • Verified against Core Banking",
+    badgeVariant: "info",
+    caseId: "fdr-011",
+    files: [
+      { name: "fdr-011_FDR-2024-GJ-011_SIMULATED.pdf", type: "FDR_COPY", label: "HDFC FDR Certificate (₹40 Lakh)" },
+      { name: "10_Affidavit_6_Release_Security_Deposit_SIMULATED.pdf", type: "AFFIDAVIT_6", label: "Notarized Affidavit-6" },
+      { name: "11_Request_Letter_Release_REL-2026-0012_SIMULATED.pdf", type: "INSTITUTION_REQUEST_LETTER", label: "Institutional Request Letter" },
+      { name: "13_Latest_LoA_EoA_Illustrative_SIMULATED.pdf", type: "LOA_EOA", label: "Council Approval Letter" },
+    ],
+  },
 ];
 
 function buildInitialAnalysis(caseId) {
-  const scenarioId = caseId === "rel-002" ? "scenario_2" : caseId === "rel-003" ? "scenario_3" : "scenario_1";
+  let scenarioId = "scenario_1";
+  if (caseId === "rel-002") scenarioId = "scenario_2";
+  else if (caseId === "rel-003") scenarioId = "scenario_3";
+  else if (caseId === "fdr-010" || caseId === "scenario_4") scenarioId = "scenario_4";
+  else if (caseId === "fdr-011" || caseId === "scenario_5") scenarioId = "scenario_5";
+
   const seeded = getSeededExtraction(scenarioId);
+
+  const scenarioMap = {
+    scenario_1: {
+      institution_name: "Delhi Institute of Engineering & Technology",
+      amount: 3000000,
+      bank_name: "Union Bank of India",
+      fdr_number: "UBI-FDR-6629104829",
+      issue_date: "2016-08-01",
+      maturity_date: "2026-08-01",
+    },
+    scenario_2: {
+      institution_name: "Vivekananda College of Technology & Management",
+      amount: 5000000,
+      bank_name: "Canara Bank",
+      fdr_number: "CNRB-FDR-7712093845",
+      issue_date: "2024-10-01",
+      maturity_date: "2029-10-01",
+    },
+    scenario_3: {
+      institution_name: "Delhi Institute of Engineering & Technology",
+      amount: 1500000,
+      bank_name: "Punjab National Bank",
+      fdr_number: "PNB-FDR-4481029311",
+      issue_date: "2024-03-15",
+      maturity_date: "2027-03-15",
+    },
+    scenario_4: {
+      institution_name: "Bangalore Institute of Advanced Technology",
+      amount: 7500000,
+      bank_name: "State Bank of India",
+      fdr_number: "SBI-FDR-8819203912",
+      issue_date: "2023-07-20",
+      maturity_date: "2028-07-20",
+    },
+    scenario_5: {
+      institution_name: "Gujarat Technological & Research Academy",
+      amount: 4000000,
+      bank_name: "HDFC Bank",
+      fdr_number: "HDFC-FDR-9928172635",
+      issue_date: "2024-01-10",
+      maturity_date: "2029-01-10",
+    },
+  };
+
+  const scInfo = scenarioMap[scenarioId] || scenarioMap.scenario_1;
   const caseRecord = {
     id: caseId || "rel-001",
     request_reference: "REL-2026-0012",
-    institution_name:
-      scenarioId === "scenario_2"
-        ? "Vivekananda College of Technology & Management"
-        : "Delhi Institute of Engineering & Technology",
-    amount: scenarioId === "scenario_2" ? 5000000 : scenarioId === "scenario_3" ? 1500000 : 3000000,
-    bank_name: scenarioId === "scenario_2" ? "Canara Bank" : scenarioId === "scenario_3" ? "Punjab National Bank" : "Union Bank of India",
-    fdr_number: scenarioId === "scenario_2" ? "CNRB-FDR-7712093845" : scenarioId === "scenario_3" ? "PNB-FDR-4481029311" : "UBI-FDR-6629104829",
-    issue_date: scenarioId === "scenario_2" ? "2024-10-01" : scenarioId === "scenario_3" ? "2024-03-15" : "2016-08-01",
-    maturity_date: scenarioId === "scenario_2" ? "2029-10-01" : scenarioId === "scenario_3" ? "2027-03-15" : "2026-08-01",
+    ...scInfo,
     lien_marked: true,
   };
   const deterministicChecks = runDeterministicChecks(seeded.extraction, caseRecord, seeded.extraction.catalogued_documents);

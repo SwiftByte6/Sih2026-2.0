@@ -30,12 +30,16 @@ import {
   getDashboardMetrics,
   getInstruments,
   getNotifications,
+  getInstitutions,
+  getCurrentUser,
   formatINR,
   formatDate,
   formatDateTime,
 } from "@/lib/dataService";
 
 export default function InstitutionDashboardPage() {
+  const [institutionsList, setInstitutionsList] = useState([]);
+  const [selectedInstitutionId, setSelectedInstitutionId] = useState("inst-001");
   const [metrics, setMetrics] = useState(null);
   const [myInstruments, setMyInstruments] = useState([]);
   const [notifications, setNotifications] = useState([]);
@@ -48,14 +52,31 @@ export default function InstitutionDashboardPage() {
   const [isSubmittingResponse, setIsSubmittingResponse] = useState(false);
   const [responseSuccessMsg, setResponseSuccessMsg] = useState("");
 
-  // Institution scope: Delhi Institute of Engineering & Technology (inst-001)
-  const institutionId = "inst-001";
+  // Initialize selected institution from current logged-in user
+  useEffect(() => {
+    const user = getCurrentUser();
+    if (user?.institution_id) {
+      setSelectedInstitutionId(user.institution_id);
+    }
+  }, []);
+
+  useEffect(() => {
+    async function loadInstitutions() {
+      try {
+        const insts = await getInstitutions();
+        setInstitutionsList(insts);
+      } catch (e) {
+        console.warn("Could not load institutions list:", e);
+      }
+    }
+    loadInstitutions();
+  }, []);
 
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const m = await getDashboardMetrics("institution", institutionId);
-      const instData = await getInstruments({ institution_id: institutionId, pageSize: 6 });
+      const m = await getDashboardMetrics("institution", selectedInstitutionId);
+      const instData = await getInstruments({ institution_id: selectedInstitutionId, pageSize: 6 });
       const notifs = await getNotifications("institution_admin");
 
       setMetrics(m);
@@ -64,7 +85,14 @@ export default function InstitutionDashboardPage() {
       setLoading(false);
     }
     load();
-  }, []);
+  }, [selectedInstitutionId]);
+
+  const currentInstitution = institutionsList.find((i) => i.id === selectedInstitutionId) || {
+    id: selectedInstitutionId,
+    institution_name: "Delhi Institute of Engineering & Technology",
+    aicte_institution_id: "1-109283741",
+    state: "New Delhi",
+  };
 
   const handleOpenClarificationModal = (inst) => {
     setSelectedInstrument(inst);
@@ -85,14 +113,14 @@ export default function InstitutionDashboardPage() {
   };
 
   const handleDownloadSummary = () => {
-    const content = `AICTE SECURITY DEPOSIT & FDR COMPLIANCE REPORT\nInstitution: Delhi Institute of Engineering & Technology (1-109283741)\nDate: ${new Date().toLocaleDateString()}\nTotal Instruments: ${myInstruments.length}\nTotal Secured Amount: ₹${metrics?.totalSecuredAmount?.toLocaleString("en-IN") || "50,00,000"}\n\nInstruments:\n` +
+    const content = `AICTE SECURITY DEPOSIT & FDR COMPLIANCE REPORT\nInstitution: ${currentInstitution.institution_name} (${currentInstitution.aicte_institution_id})\nDate: ${new Date().toLocaleDateString()}\nTotal Instruments: ${myInstruments.length}\nTotal Secured Amount: ₹${metrics?.totalSecuredAmount?.toLocaleString("en-IN") || "50,00,000"}\n\nInstruments:\n` +
       myInstruments.map((inst) => `- ${inst.instrument_reference} | ${inst.bank_name} | ₹${inst.amount.toLocaleString("en-IN")} | Maturity: ${inst.maturity_date} | Status: ${inst.verification_status}`).join("\n");
 
     const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `AICTE_FDR_Compliance_Summary_${institutionId}.txt`;
+    a.download = `AICTE_FDR_Compliance_Summary_${selectedInstitutionId}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -105,17 +133,32 @@ export default function InstitutionDashboardPage() {
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                Delhi Institute of Engineering & Technology
-              </h1>
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <Building2 className="w-5 h-5 text-blue-700 shrink-0" />
+              {institutionsList.length > 0 ? (
+                <select
+                  value={selectedInstitutionId}
+                  onChange={(e) => setSelectedInstitutionId(e.target.value)}
+                  className="text-lg sm:text-xl font-bold tracking-tight text-slate-900 bg-white border border-slate-300 rounded-lg px-2.5 py-1 focus:ring-2 focus:ring-blue-600 focus:outline-none shadow-xs cursor-pointer max-w-md truncate"
+                >
+                  {institutionsList.map((inst) => (
+                    <option key={inst.id} value={inst.id}>
+                      {inst.institution_name} ({inst.state})
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+                  {currentInstitution.institution_name}
+                </h1>
+              )}
               <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
                 Accredited / Approved
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-1">
-              AICTE Permanent Institute ID: <strong className="text-slate-800 font-mono">1-109283741</strong> • Northern Region (New Delhi)
+            <p className="text-xs text-slate-500">
+              AICTE Permanent Institute ID: <strong className="text-slate-800 font-mono">{currentInstitution.aicte_institution_id}</strong> • {currentInstitution.state}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">

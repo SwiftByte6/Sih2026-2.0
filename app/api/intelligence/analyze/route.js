@@ -50,19 +50,62 @@ export async function POST(request) {
     }
 
     if (!caseRecord) {
-      // Default fallback case record if standalone or unlinked
+      try {
+        caseRecord = await getInstrumentById(case_id);
+      } catch {
+        caseRecord = null;
+      }
+    }
+
+    if (!caseRecord) {
+      const scenarioFallbacks = {
+        scenario_1: {
+          institution_name: "Delhi Institute of Engineering & Technology",
+          amount: 3000000,
+          bank_name: "Union Bank of India",
+          fdr_number: "UBI-FDR-6629104829",
+          issue_date: "2016-08-01",
+          maturity_date: "2026-08-01",
+        },
+        scenario_2: {
+          institution_name: "Vivekananda College of Technology & Management",
+          amount: 5000000,
+          bank_name: "Canara Bank",
+          fdr_number: "CNRB-FDR-7712093845",
+          issue_date: "2024-10-01",
+          maturity_date: "2029-10-01",
+        },
+        scenario_3: {
+          institution_name: "Delhi Institute of Engineering & Technology",
+          amount: 1500000,
+          bank_name: "Punjab National Bank",
+          fdr_number: "PNB-FDR-4481029311",
+          issue_date: "2024-03-15",
+          maturity_date: "2027-03-15",
+        },
+        scenario_4: {
+          institution_name: "Bangalore Institute of Advanced Technology",
+          amount: 7500000,
+          bank_name: "State Bank of India",
+          fdr_number: "SBI-FDR-8819203912",
+          issue_date: "2023-07-20",
+          maturity_date: "2028-07-20",
+        },
+        scenario_5: {
+          institution_name: "Gujarat Technological & Research Academy",
+          amount: 4000000,
+          bank_name: "HDFC Bank",
+          fdr_number: "HDFC-FDR-9928172635",
+          issue_date: "2024-01-10",
+          maturity_date: "2029-01-10",
+        },
+      };
+
+      const fallbackInfo = scenarioFallbacks[scenario_id] || scenarioFallbacks.scenario_1;
       caseRecord = {
-        id: "rel-001",
+        id: case_id || "rel-001",
         request_reference: "REL-2026-0012",
-        institution_name:
-          scenario_id === "scenario_2"
-            ? "Vivekananda College of Technology & Management"
-            : "Delhi Institute of Engineering & Technology",
-        amount: scenario_id === "scenario_2" ? 5000000 : 3000000,
-        bank_name: scenario_id === "scenario_2" ? "Canara Bank" : "Union Bank of India",
-        fdr_number: scenario_id === "scenario_2" ? "CNRB-FDR-7712093845" : "UBI-FDR-6629104829",
-        issue_date: scenario_id === "scenario_2" ? "2024-10-01" : "2016-08-01",
-        maturity_date: scenario_id === "scenario_2" ? "2029-10-01" : "2026-08-01",
+        ...fallbackInfo,
         lien_marked: true,
         lien_details: "Joint Lien in favor of Member Secretary, AICTE",
       };

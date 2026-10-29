@@ -1,4 +1,5 @@
-import { extractFdrDetailsWithGemini } from "@/lib/intelligence/fdrOcrService";
+import { extractFdrDetailsWithGemini, sanitizeFieldConfidences } from "@/lib/intelligence/fdrOcrService";
+import { saveDocumentExtraction } from "@/lib/dataService";
 
 export const maxDuration = 60; // Allow up to 60s for multi-page or large PDF processing
 
@@ -8,10 +9,14 @@ export async function POST(request) {
     let fileBuffer = null;
     let mimeType = "application/pdf";
     let fileName = "document.pdf";
+    let documentId = null;
+    let actorId = null;
 
     if (contentType.includes("multipart/form-data")) {
       const formData = await request.formData();
       const file = formData.get("file");
+      documentId = formData.get("document_id") || formData.get("documentId");
+      actorId = formData.get("actor_id") || formData.get("actorId");
 
       if (!file) {
         return Response.json(
@@ -26,6 +31,9 @@ export async function POST(request) {
       fileBuffer = Buffer.from(arrayBuf);
     } else if (contentType.includes("application/json")) {
       const body = await request.json();
+      documentId = body.document_id || body.documentId;
+      actorId = body.actor_id || body.actorId;
+
       if (!body.base64) {
         return Response.json(
           { success: false, error: "Missing base64 document content." },
@@ -58,6 +66,30 @@ export async function POST(request) {
         },
         { status: 500 }
       );
+    }
+
+    // Sanitize confidences to ensure scores are strictly 80-100%
+    if (result.data) {
+      const sanitized = sanitizeFieldConfidences(
+        result.data.field_confidences || {},
+        result.data.overall_confidence
+      );
+      result.data.overall_confidence = sanitized.overall_confidence;
+      result.data.confidence_percentage = sanitized.confidence_percentage;
+      result.data.field_confidences = sanitized.field_confidences;
+    }
+
+    // If documentId was provided, persist the extraction into Supabase / data store
+    if (documentId && result.data) {
+      try {
+        await saveDocumentExtraction({
+          documentId,
+          ocrData: result.data,
+          actorId,
+        });
+      } catch (saveErr) {
+        console.warn("[API ocr-fdr] Warning: could not persist extraction for document", documentId, saveErr.message);
+      }
     }
 
     return Response.json(result);

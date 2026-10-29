@@ -591,6 +591,28 @@ using (
   )
 );
 
+create policy extractions_insert_scoped on public.document_extractions
+for insert to authenticated
+with check (
+  exists (
+    select 1 from public.documents d
+    where d.id = document_id
+      and (
+        public.is_institution_member(d.institution_id)
+        or public.has_role(array['super_admin','aicte_admin','reviewer']::public.app_role[])
+      )
+  )
+);
+
+create policy extractions_update_scoped on public.document_extractions
+for update to authenticated
+using (
+  public.has_role(array['super_admin','aicte_admin','reviewer']::public.app_role[])
+)
+with check (
+  public.has_role(array['super_admin','aicte_admin','reviewer']::public.app_role[])
+);
+
 create policy verification_requests_select_scoped on public.verification_requests
 for select to authenticated
 using (

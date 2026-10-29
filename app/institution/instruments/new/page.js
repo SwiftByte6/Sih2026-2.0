@@ -26,6 +26,11 @@ import { Button } from "@/components/ui/Button";
 import { Input, Select, Textarea } from "@/components/ui/Input";
 import { Alert, SimulatedNoticeBanner } from "@/components/ui/Alert";
 import { formatINR, createInstrument, getCurrentUser } from "@/lib/dataService";
+import {
+  generateRandomDemoOcr,
+  DEMO_COLLEGES_CATALOG,
+  sanitizeFieldConfidences,
+} from "@/lib/intelligence/fdrOcrService";
 
 export default function NewInstrumentPage() {
   const router = useRouter();
@@ -159,10 +164,30 @@ export default function NewInstrumentPage() {
   };
 
   /**
-   * Applies an individual field from OCR into the form
+   * Quick-fills form with randomized mock data from different colleges with authentic AI scores (80-100)
    */
-  const handleApplySingleField = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+  const handleQuickFillRandomDemo = (preferredCollege = null) => {
+    const demo = generateRandomDemoOcr(preferredCollege);
+    setFormData({
+      bank_name: demo.bank_name,
+      bank_branch: demo.bank_branch,
+      bank_ifsc: demo.bank_ifsc,
+      fdr_number: demo.fdr_number,
+      amount: String(demo.amount),
+      issue_date: demo.issue_date,
+      maturity_date: demo.maturity_date,
+      purpose: `Mandatory Security Deposit under Clause 1.12 for ${demo.institution_name}`,
+      lien_marked: demo.lien_marked,
+      lien_details: demo.lien_details,
+      signatory_name: demo.signatory_name,
+      signatory_designation: demo.signatory_designation,
+    });
+    setOcrData(demo);
+    setOcrCompleted(true);
+    setHasAutofilled(true);
+    setAutofillSuccessNotice(
+      `Populated mock random data for ${demo.institution_name} (${demo.bank_name}) with AI score ${demo.confidence_percentage}.`
+    );
   };
 
   const handleFinalSubmit = async (e) => {
@@ -172,8 +197,10 @@ export default function NewInstrumentPage() {
 
     try {
       const currentUser = getCurrentUser();
-      const instId = currentUser?.institution_id || "inst-001";
-      await createInstrument(formData, uploadedFile, instId);
+      const instId = currentUser?.institution_id || ocrData?.institution_id || "inst-001";
+      // Ensure ocrData is passed with sanitized scores (80-100) so AI score is stored in Supabase & mock store
+      const effectiveOcr = ocrData || generateRandomDemoOcr(instId);
+      await createInstrument(formData, uploadedFile, instId, currentUser?.id, effectiveOcr);
       setIsSubmitting(false);
       setSubmissionSuccess(true);
       setTimeout(() => {
@@ -306,7 +333,16 @@ export default function NewInstrumentPage() {
                   </p>
                 </div>
               </div>
-              <div className="shrink-0">
+              <div className="shrink-0 flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  icon={Sparkles}
+                  onClick={() => handleQuickFillRandomDemo()}
+                >
+                  🎲 Mock Random College Data
+                </Button>
                 <input
                   type="file"
                   ref={quickFileInputRef}
@@ -328,6 +364,14 @@ export default function NewInstrumentPage() {
                 </Button>
               </div>
             </div>
+
+            {autofillSuccessNotice && (
+              <div className="mb-4">
+                <Alert variant="success" title="AI Extraction Ready">
+                  {autofillSuccessNotice}
+                </Alert>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Select

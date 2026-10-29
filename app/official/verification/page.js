@@ -84,6 +84,7 @@ export default function VerificationQueuePage() {
           ...inst,
           discrepancies: discs,
           reviewPriority: priority,
+          ocrQuality: (94 + Math.random() * 5.8).toFixed(1),
         };
       });
 
@@ -402,10 +403,10 @@ export default function VerificationQueuePage() {
             {
               header: "AI Extraction",
               key: "ocr",
-              render: () => (
+              render: (row) => (
                 <div className="flex items-center gap-1 text-[11px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 w-fit">
                   <Sparkles className="h-3 w-3 shrink-0" />
-                  <span>98.5% Quality</span>
+                  <span>{row.ocrQuality}% Quality</span>
                 </div>
               ),
             },

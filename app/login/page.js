@@ -31,6 +31,51 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
+  const [selectedInstUser, setSelectedInstUser] = useState("user-inst-1");
+
+  const institutionProfiles = [
+    {
+      userId: "user-inst-1",
+      institutionId: "inst-001",
+      name: "Delhi Institute of Engineering & Technology",
+      contact: "Prof. Sunita Verma",
+      email: "registrar@diet-delhi.edu.in",
+      aicteId: "1-109283741",
+    },
+    {
+      userId: "user-inst-2",
+      institutionId: "inst-002",
+      name: "Vivekananda College of Technology & Management",
+      contact: "Dr. K. R. Ramanathan",
+      email: "principal@vctm-chennai.ac.in",
+      aicteId: "1-209384752",
+    },
+    {
+      userId: "user-inst-3",
+      institutionId: "inst-006",
+      name: "Bangalore Institute of Advanced Technology",
+      contact: "Dr. Ramesh Naidu",
+      email: "registrar@biat-bengaluru.edu.in",
+      aicteId: "1-602918374",
+    },
+    {
+      userId: "user-inst-4",
+      institutionId: "inst-007",
+      name: "Gujarat Technological & Research Academy",
+      contact: "Dr. Bhavin Patel",
+      email: "principal@gtra-ahmedabad.ac.in",
+      aicteId: "1-703819284",
+    },
+    {
+      userId: "user-inst-5",
+      institutionId: "inst-010",
+      name: "National Institute of Engineering & Research (Kolkata)",
+      contact: "Prof. Ananya Roy",
+      email: "registrar@nier-kolkata.ac.in",
+      aicteId: "1-100293847",
+    },
+  ];
+
   const handleSelectRolePreset = (roleType) => {
     setSelectedRole(roleType);
     setErrorMsg("");
@@ -38,11 +83,21 @@ export default function LoginPage() {
       setEmail("rajesh.sharma@aicte-india.org");
       setAicteId("");
     } else if (roleType === "institution") {
-      setEmail("registrar@diet-delhi.edu.in");
-      setAicteId("1-109283741");
+      const p = institutionProfiles.find((ip) => ip.userId === selectedInstUser) || institutionProfiles[0];
+      setEmail(p.email);
+      setAicteId(p.aicteId);
     } else if (roleType === "admin") {
       setEmail("anil.deshmukh@aicte-india.org");
       setAicteId("");
+    }
+  };
+
+  const handleSelectInstitutionProfile = (userId) => {
+    setSelectedInstUser(userId);
+    const p = institutionProfiles.find((ip) => ip.userId === userId);
+    if (p) {
+      setEmail(p.email);
+      setAicteId(p.aicteId);
     }
   };
 
@@ -51,17 +106,12 @@ export default function LoginPage() {
     setIsLoading(true);
     setErrorMsg("");
 
-    // BACKEND INTEGRATION:
-    // Future Supabase Auth call:
-    // const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    // Followed by fetching user role from `role_assignments` and redirecting accordingly.
-
     setTimeout(() => {
       setIsLoading(false);
       let targetUser = MOCK_USERS[0];
 
       if (selectedRole === "institution") {
-        targetUser = MOCK_USERS.find((u) => u.id === "user-inst-1");
+        targetUser = MOCK_USERS.find((u) => u.id === selectedInstUser) || MOCK_USERS.find((u) => u.id === "user-inst-1");
         setCurrentUser(targetUser.id);
         router.push("/institution/dashboard");
       } else if (selectedRole === "admin") {
@@ -138,6 +188,28 @@ export default function LoginPage() {
           {/* Login Card */}
           <Card className="p-6 bg-white border border-slate-200 shadow-sm">
             <form onSubmit={handleLoginSubmit} className="space-y-4">
+              {selectedRole === "institution" && (
+                <div className="space-y-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
+                  <label className="block text-xs font-semibold text-blue-900">
+                    Select Demo Institution / College Account:
+                  </label>
+                  <select
+                    value={selectedInstUser}
+                    onChange={(e) => handleSelectInstitutionProfile(e.target.value)}
+                    className="w-full text-xs font-medium text-slate-800 bg-white border border-slate-300 rounded-md px-2.5 py-1.5 focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                  >
+                    {institutionProfiles.map((p) => (
+                      <option key={p.userId} value={p.userId}>
+                        {p.name} ({p.contact})
+                      </option>
+                    ))}
+                  </select>
+                  <div className="text-[11px] text-blue-700 font-mono">
+                    Permanent AICTE ID: <strong>{aicteId}</strong>
+                  </div>
+                </div>
+              )}
+
               <Input
                 label="Official Email Address"
                 type="email"
@@ -146,17 +218,6 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@aicte-india.org"
               />
-
-              {selectedRole === "institution" && (
-                <Input
-                  label="AICTE Permanent Institute ID"
-                  required
-                  value={aicteId}
-                  onChange={(e) => setAicteId(e.target.value)}
-                  placeholder="e.g. 1-109283741"
-                  helpText="Found on your AICTE Approval / EoA letter"
-                />
-              )}
 
               <Input
                 label="Account Password"
@@ -214,7 +275,7 @@ export default function LoginPage() {
                   {selectedRole === "official"
                     ? "Dr. Rajesh Sharma (Senior Reviewer)"
                     : selectedRole === "institution"
-                    ? "Prof. Sunita Verma (Delhi Institute)"
+                    ? `${institutionProfiles.find((p) => p.userId === selectedInstUser)?.contact} (${institutionProfiles.find((p) => p.userId === selectedInstUser)?.name})`
                     : "Anil Deshmukh (Council Super Admin)"}
                 </span>
               </div>

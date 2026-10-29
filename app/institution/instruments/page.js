@@ -17,10 +17,11 @@ import { StatusBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input, Select } from "@/components/ui/Input";
 import { Pagination } from "@/components/ui/Pagination";
-import { getInstruments, formatINR, formatDate, getCurrentUser } from "@/lib/dataService";
+import { getInstruments, getInstitutions, formatINR, formatDate, getCurrentUser } from "@/lib/dataService";
 
 export default function InstitutionInstrumentsPage() {
   const [instruments, setInstruments] = useState([]);
+  const [institutionsList, setInstitutionsList] = useState([]);
   const [search, setSearch] = useState("");
   const [lifecycleFilter, setLifecycleFilter] = useState("");
   const [verificationFilter, setVerificationFilter] = useState("");
@@ -30,14 +31,25 @@ export default function InstitutionInstrumentsPage() {
   const [loading, setLoading] = useState(true);
 
   const currentUser = getCurrentUser();
-  const institutionId = currentUser?.institution_id || "inst-001";
+  const [selectedInstId, setSelectedInstId] = useState(currentUser?.institution_id || "inst-001");
+
+  useEffect(() => {
+    async function loadInstitutions() {
+      try {
+        const insts = await getInstitutions();
+        setInstitutionsList(insts);
+      } catch (e) {
+        console.warn("Could not load institutions list:", e);
+      }
+    }
+    loadInstitutions();
+  }, []);
 
   useEffect(() => {
     async function load() {
-      // BACKEND INTEGRATION:
-      // supabase.from('financial_instruments').select('*').eq('institution_id', user.institution_id)
+      setLoading(true);
       const res = await getInstruments({
-        institution_id: institutionId,
+        institution_id: selectedInstId || undefined,
         search,
         lifecycle_status: lifecycleFilter || undefined,
         verification_status: verificationFilter || undefined,
@@ -50,7 +62,7 @@ export default function InstitutionInstrumentsPage() {
       setLoading(false);
     }
     load();
-  }, [institutionId, search, lifecycleFilter, verificationFilter, page]);
+  }, [selectedInstId, search, lifecycleFilter, verificationFilter, page]);
 
   return (
     <AppShell
@@ -79,7 +91,7 @@ export default function InstitutionInstrumentsPage() {
 
         {/* Filter bar */}
         <Card className="p-4 bg-white border border-slate-200">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div>
               <Input
                 placeholder="Search FDR No, Bank, Reference..."
@@ -88,6 +100,17 @@ export default function InstitutionInstrumentsPage() {
                 icon={Search}
               />
             </div>
+            <Select
+              value={selectedInstId}
+              onChange={(e) => setSelectedInstId(e.target.value)}
+              options={[
+                { value: "", label: "All Colleges (Overview)" },
+                ...institutionsList.map((inst) => ({
+                  value: inst.id,
+                  label: `${inst.institution_name} (${inst.state})`,
+                })),
+              ]}
+            />
             <Select
               value={lifecycleFilter}
               onChange={(e) => setLifecycleFilter(e.target.value)}
